@@ -45,7 +45,7 @@ def render_style_config(pixelle_video):
         # Inference mode selection
         tts_mode = st.radio(
             tr("tts.inference_mode"),
-            ["local", "comfyui"],
+            ["local", "macos", "piper", "comfyui"],
             horizontal=True,
             format_func=lambda x: tr(f"tts.mode.{x}"),
             index=0 if tts_config.get("inference_mode", "local") == "local" else 1,
@@ -55,6 +55,10 @@ def render_style_config(pixelle_video):
         # Show hint based on mode
         if tts_mode == "local":
             st.caption(tr("tts.mode.local_hint"))
+        elif tts_mode == "macos":
+            st.caption(tr("tts.mode.macos_hint"))
+        elif tts_mode == "piper":
+            st.caption(tr("tts.mode.piper_hint"))
         else:
             st.caption(tr("tts.mode.comfyui_hint"))
         
@@ -117,7 +121,100 @@ def render_style_config(pixelle_video):
             # Variables for video generation
             tts_workflow_key = None
             ref_audio_path = None
-        
+
+        # ================================================================
+        # macOS TTS Mode UI
+        # ================================================================
+        elif tts_mode == "macos":
+            # Check if macOS TTS is available
+            from pixelle_video.services.tts_macos import MacOSTTSClient, MACOS_VOICES
+
+            if not MacOSTTSClient.is_available():
+                st.warning(
+                    "⚠️ macOS TTS 仅在 macOS 系统上可用。请使用本地合成（Edge TTS）。"
+                    if get_language() == "zh_CN"
+                    else "⚠️ macOS TTS is only available on macOS. Please use Local Synthesis (Edge TTS)."
+                )
+                # Fallback to local mode
+                st.session_state["digital_tts_inference_mode"] = "local"
+                st.rerun()
+
+            # Get saved voice from config
+            macos_config = tts_config.get("macos", {})
+            saved_voice = macos_config.get("voice", "Ting-Ting")
+
+            # Build voice options
+            voice_options = []
+            voice_names = []
+            default_voice_index = 0
+
+            for locale, voices in MACOS_VOICES.items():
+                for voice_id, voice_info in voices.items():
+                    display_name = voice_info.get("display_name", voice_info["name"])
+                    voice_options.append(display_name)
+                    voice_names.append(voice_info["name"])
+
+                    # Set default index if matches saved voice
+                    if voice_info["name"] == saved_voice:
+                        default_voice_index = len(voice_options) - 1
+
+            # Voice selector
+            selected_voice_display = st.selectbox(
+                tr("tts.voice_selector"),
+                voice_options,
+                index=default_voice_index,
+                key="digital_tts_macos_voice"
+            )
+
+            # Get actual voice name
+            selected_voice_index = voice_options.index(selected_voice_display)
+            selected_voice = voice_names[selected_voice_index]
+
+            # Variables for video generation
+            tts_speed = 1.0
+            tts_workflow_key = None
+            ref_audio_path = None
+
+        # ================================================================
+        # Piper TTS Mode UI
+        # ================================================================
+        elif tts_mode == "piper":
+            # Get saved voice from config
+            piper_config = tts_config.get("piper", {})
+            saved_voice = piper_config.get("voice", "zh_CN-huayan-medium")
+
+            # Piper voice options (can be extended)
+            piper_voices = [
+                {"id": "zh_CN-huayan-medium", "name": "华燕（中文女声）"},
+                {"id": "en_US-lessac-medium", "name": "Lessac (English Female)"},
+                {"id": "en_US-ryan-medium", "name": "Ryan (English Male)"},
+            ]
+
+            voice_options = [v["name"] for v in piper_voices]
+            voice_ids = [v["id"] for v in piper_voices]
+            default_voice_index = 0
+
+            # Set default index if matches saved voice
+            if saved_voice in voice_ids:
+                default_voice_index = voice_ids.index(saved_voice)
+
+            # Voice selector
+            selected_voice_display = st.selectbox(
+                tr("tts.voice_selector"),
+                voice_options,
+                index=default_voice_index,
+                key="digital_tts_piper_voice"
+            )
+
+            # Get actual voice ID
+            selected_voice_index = voice_options.index(selected_voice_display)
+            selected_voice = voice_ids[selected_voice_index]
+
+            # Variables for video generation
+            tts_speed = 1.0
+            tts_workflow_key = None
+            ref_audio_path = None
+
         # ================================================================
         # ComfyUI Mode UI
         # ================================================================
@@ -174,6 +271,10 @@ def render_style_config(pixelle_video):
                         if tts_mode == "local":
                             tts_params["voice"] = selected_voice
                             tts_params["speed"] = tts_speed
+                        elif tts_mode == "macos":
+                            tts_params["voice"] = selected_voice
+                        elif tts_mode == "piper":
+                            tts_params["voice"] = selected_voice
                         else:  # comfyui
                             tts_params["workflow"] = tts_workflow_key
                             if ref_audio_path:
@@ -202,7 +303,7 @@ def render_style_config(pixelle_video):
     # Return all style configuration parameters (Simplified version only local TTS)
     return {
         "tts_inference_mode": tts_mode,
-        "tts_voice": selected_voice if tts_mode == "local" else None,
+        "tts_voice": selected_voice if tts_mode in ["local", "macos", "piper"] else None,
         "tts_speed": tts_speed if tts_mode == "local" else None,
         "tts_workflow": tts_workflow_key if tts_mode == "comfyui" else None,
         "ref_audio": str(ref_audio_path) if ref_audio_path else None,
