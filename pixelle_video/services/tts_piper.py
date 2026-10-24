@@ -160,10 +160,18 @@ class PiperTTSClient:
             # Use temporary WAV file, then convert to MP3
             temp_wav = output_path.with_suffix(".wav")
 
-            # Synthesize to WAV
+            # Synthesize to WAV using correct Piper API
             logger.debug(f"Synthesizing text to WAV: {temp_wav}")
-            with open(temp_wav, "wb") as wav_file:
-                voice_instance.synthesize(text, wav_file)
+            import wave
+            chunks = list(voice_instance.synthesize(text))
+            if chunks:
+                with wave.open(str(temp_wav), 'wb') as wav_file:
+                    first_chunk = chunks[0]
+                    wav_file.setframerate(first_chunk.sample_rate)
+                    wav_file.setsampwidth(first_chunk.sample_width)
+                    wav_file.setnchannels(first_chunk.sample_channels)
+                    for chunk in chunks:
+                        wav_file.writeframes(chunk.audio_int16_bytes)
 
             # Check if WAV was created
             if not temp_wav.exists():
