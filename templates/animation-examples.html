@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>动画库使用示例</title>
+
+    <!-- 引入动画库 -->
+    <link rel="stylesheet" href="animations/text-animations.css">
+    <link rel="stylesheet" href="animations/image-animations.css">
+    <link rel="stylesheet" href="animations/background-animations.css">
+
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #f5f5f5;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 40px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .section h2 {
+            color: #666;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .demo-box {
+            display: inline-block;
+            padding: 20px;
+            margin: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .image-demo {
+            width: 200px;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin: 10px;
+            display: inline-block;
+        }
+
+        .orb-demo {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(165, 180, 252, 0.8), transparent);
+            margin: 20px;
+            display: inline-block;
+        }
+
+        .code-block {
+            background: #f0f0f0;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+
+        .note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .note strong {
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎬 动画库使用示例</h1>
+
+    <!-- 文字动画示例 -->
+    <div class="section">
+        <h2>📝 文字动画</h2>
+
+        <h3>1. 淡入效果</h3>
+        <div class="demo-box animate-fade-in">淡入</div>
+        <div class="demo-box animate-fade-in-up">淡入上滑</div>
+        <div class="demo-box animate-fade-in-down">淡入下滑</div>
+        <div class="demo-box animate-fade-in-left">淡入左滑</div>
+        <div class="demo-box animate-fade-in-right">淡入右滑</div>
+
+        <div class="code-block">
+&lt;div class="animate-fade-in-up"&gt;文字内容&lt;/div&gt;
+&lt;div class="animate-fade-in-up delay-300"&gt;延迟0.3秒出现&lt;/div&gt;
+        </div>
+
+        <h3>2. 滑入效果</h3>
+        <div class="demo-box animate-slide-in-up">上滑入场</div>
+        <div class="demo-box animate-slide-in-left">左滑入场</div>
+
+        <h3>3. 发光脉冲</h3>
+        <div class="demo-box animate-glow-pulse">发光脉冲</div>
+        <div class="demo-box animate-glow-pulse-accent">彩色脉冲</div>
+
+        <h3>4. 缩放入场</h3>
+        <div class="demo-box animate-scale-in">缩放入场</div>
+        <div class="demo-box animate-scale-in-bounce">弹性缩放</div>
+
+        <h3>5. 依次出现</h3>
+        <div class="demo-box animate-fade-in-up delay-100">第一行</div>
+        <div class="demo-box animate-fade-in-up delay-300">第二行</div>
+        <div class="demo-box animate-fade-in-up delay-500">第三行</div>
+        <div class="demo-box animate-fade-in-up delay-700">第四行</div>
+
+        <div class="note">
+            <strong>技巧：</strong> 使用 <code>delay-100</code> 到 <code>delay-2000</code> 类控制元素依次出现的时间。
+        </div>
+    </div>
+
+    <!-- 图片动画示例 -->
+    <div class="section">
+        <h2>🖼️ 图片动画</h2>
+
+        <h3>1. 缩放入场</h3>
+        <img src="https://via.placeholder.com/200x150/667eea/ffffff?text=Zoom+In"
+             class="image-demo animate-image-zoom-in" alt="缩放入场">
+
+        <div class="code-block">
+&lt;img class="animate-image-zoom-in" src="image.jpg"&gt;
+        </div>
+
+        <h3>2. 渐显动画</h3>
+        <img src="https://via.placeholder.com/200x150/764ba2/ffffff?text=Fade+In"
+             class="image-demo animate-image-fade-in-up" alt="渐显上滑">
+
+        <h3>3. Ken Burns 效果（缓慢推进）</h3>
+        <img src="https://via.placeholder.com/200x150/f093fb/ffffff?text=Ken+Burns"
+             class="image-demo animate-ken-burns-zoom" alt="Ken Burns">
+
+        <div class="note">
+            <strong>推荐：</strong> Ken Burns 效果适合风景、艺术图片，建议时长 8-12 秒。
+        </div>
+
+        <h3>4. 浮动效果</h3>
+        <img src="https://via.placeholder.com/200x150/4facfe/ffffff?text=Float"
+             class="image-demo animate-image-float" alt="浮动">
+        <img src="https://via.placeholder.com/200x150/00f2fe/ffffff?text=Float+Scale"
+             class="image-demo animate-image-float-scale" alt="浮动缩放">
+
+        <h3>5. 脉冲效果</h3>
+        <img src="https://via.placeholder.com/200x150/43e97b/ffffff?text=Pulse"
+             class="image-demo animate-image-pulse" alt="脉冲">
+    </div>
+
+    <!-- 背景动画示例 -->
+    <div class="section">
+        <h2>🎨 背景动画</h2>
+
+        <h3>1. 光晕脉冲</h3>
+        <div class="orb-demo animate-orb-pulse"></div>
+        <div class="orb-demo animate-orb-pulse-glow"></div>
+        <div class="orb-demo animate-orb-pulse-bright"></div>
+
+        <div class="code-block">
+&lt;div class="animate-orb-pulse-glow"&gt;&lt;/div&gt;
+        </div>
+
+        <h3>2. 浮动动画</h3>
+        <div class="orb-demo animate-float"></div>
+        <div class="orb-demo animate-float-horizontal"></div>
+        <div class="orb-demo animate-float-diagonal"></div>
+
+        <h3>3. 几何形状旋转</h3>
+        <div class="orb-demo animate-shape-rotate"
+             style="border-radius: 0; background: linear-gradient(45deg, #667eea, #764ba2);">
+        </div>
+        <div class="orb-demo animate-shape-rotate-reverse"
+             style="border-radius: 0; background: linear-gradient(45deg, #f093fb, #f5576c);">
+        </div>
+
+        <h3>4. 呼吸效果</h3>
+        <div class="orb-demo animate-breath"></div>
+        <div class="orb-demo animate-breath-slow"></div>
+
+        <h3>5. 渐变流动</h3>
+        <div style="width: 100%; height: 100px; border-radius: 10px;
+                    background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #667eea);
+                    animation: gradientFlow 5s ease infinite; background-size: 300% 100%;">
+        </div>
+
+        <div class="code-block">
+&lt;div style="background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
+            animation: gradientFlow 5s ease infinite; background-size: 300% 100%;"&gt;
+&lt;/div&gt;
+        </div>
+    </div>
+
+    <!-- 组合使用示例 -->
+    <div class="section">
+        <h2>🎭 组合使用</h2>
+
+        <h3>示例：卡片依次出现</h3>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <div class="demo-box animate-fade-in-up delay-200">
+                卡片 1
+            </div>
+            <div class="demo-box animate-fade-in-up delay-400">
+                卡片 2
+            </div>
+            <div class="demo-box animate-fade-in-up delay-600">
+                卡片 3
+            </div>
+            <div class="demo-box animate-fade-in-up delay-800">
+                卡片 4
+            </div>
+        </div>
+
+        <h3>示例：标题 + 图片 + 文字组合</h3>
+        <div style="text-align: center; padding: 20px;">
+            <h1 class="animate-fade-in-down"
+                style="background: linear-gradient(135deg, #667eea, #764ba2);
+                       -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                标题动画
+            </h1>
+
+            <img src="https://via.placeholder.com/400x200/667eea/ffffff?text=示例图片"
+                 class="animate-image-zoom-in delay-300"
+                 style="margin: 20px 0; border-radius: 10px;">
+
+            <p class="animate-fade-in-up delay-500"
+               style="color: #666; font-size: 18px; line-height: 1.6;">
+                这是一段示例文字，使用淡入上滑动画，延迟 0.5 秒出现。
+            </p>
+        </div>
+
+        <div class="code-block">
+&lt;h1 class="animate-fade-in-down"&gt;标题&lt;/h1&gt;
+&lt;img class="animate-image-zoom-in delay-300" src="image.jpg"&gt;
+&lt;p class="animate-fade-in-up delay-500"&gt;文字内容&lt;/p&gt;
+        </div>
+    </div>
+
+    <!-- 延迟类参考 -->
+    <div class="section">
+        <h2>⏱️ 延迟类参考</h2>
+
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #667eea; color: white;">
+                    <th style="padding: 10px; text-align: left;">类名</th>
+                    <th style="padding: 10px; text-align: left;">延迟时间</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px;"><code>.delay-100</code></td>
+                    <td style="padding: 10px;">0.1 秒</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px;"><code>.delay-200</code></td>
+                    <td style="padding: 10px;">0.2 秒</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px;"><code>.delay-300</code></td>
+                    <td style="padding: 10px;">0.3 秒</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px;"><code>.delay-500</code></td>
+                    <td style="padding: 10px;">0.5 秒</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px;"><code>.delay-800</code></td>
+                    <td style="padding: 10px;">0.8 秒</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px;"><code>.delay-1000</code></td>
+                    <td style="padding: 10px;">1 秒</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px;"><code>.delay-1500</code></td>
+                    <td style="padding: 10px;">1.5 秒</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px;"><code>.delay-2000</code></td>
+                    <td style="padding: 10px;">2 秒</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 时长类参考 -->
+    <div class="section">
+        <h2>⏲️ 时长类参考</h2>
+
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #667eea; color: white;">
+                    <th style="padding: 10px; text-align: left;">类名</th>
+                    <th style="padding: 10px; text-align: left;">动画时长</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px;"><code>.duration-fast</code></td>
+                    <td style="padding: 10px;">0.5 秒</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px;"><code>.duration-normal</code></td>
+                    <td style="padding: 10px;">1 秒</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px;"><code>.duration-slow</code></td>
+                    <td style="padding: 10px;">1.5 秒</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px;"><code>.duration-slower</code></td>
+                    <td style="padding: 10px;">2 秒</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px;"><code>.duration-very-slow</code></td>
+                    <td style="padding: 10px;">3 秒</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="code-block">
+&lt;!-- 快速淡入 --&gt;
+&lt;div class="animate-fade-in duration-fast"&gt;快速淡入&lt;/div&gt;
+
+&lt;!-- 慢速缩放 --&gt;
+&lt;div class="animate-scale-in duration-slow"&gt;慢速缩放&lt;/div&gt;
+        </div>
+    </div>
+
+    <!-- 使用建议 -->
+    <div class="section">
+        <h2>💡 使用建议</h2>
+
+        <h3>1. 入场顺序</h3>
+        <p>推荐顺序：标题 → 图片 → 文字 → 署名/Footer</p>
+        <p>推荐延迟：标题 0.2s → 图片 0.5s → 文字 0.8s → Footer 1.5s</p>
+
+        <h3>2. 性能优化</h3>
+        <ul>
+            <li>优先使用 <code>transform</code> 和 <code>opacity</code> 动画（GPU 加速）</li>
+            <li>避免使用 <code>width</code>、<code>height</code> 做动画</li>
+            <li>限制 <code>box-shadow</code> 动画的使用</li>
+            <li>控制同时运行的动画数量</li>
+        </ul>
+
+        <h3>3. 动画时长建议</h3>
+        <ul>
+            <li>入场动画：0.8-1.5 秒（短促有力）</li>
+            <li>持续动画：3-10 秒循环（节奏舒缓）</li>
+            <li>避免超过 15 秒的动画</li>
+        </ul>
+
+        <h3>4. ffmpeg 兼容</h3>
+        <ul>
+            <li>使用纯 CSS3 <code>@keyframes</code> 动画</li>
+            <li>避免 JavaScript 控制动画</li>
+            <li>测试静态帧渲染结果</li>
+        </ul>
+    </div>
+
+    <div class="note" style="margin-top: 40px;">
+        <strong>📝 文档：</strong>
+        完整动画列表请参考：
+        <ul>
+            <li><code>animations/text-animations.css</code> - 文字动画</li>
+            <li><code>animations/image-animations.css</code> - 图片动画</li>
+            <li><code>animations/background-animations.css</code> - 背景动画</li>
+            <li><code>ANIMATION_DESIGN.md</code> - 设计方案</li>
+            <li><code>ANIMATION_PREVIEW.md</code> - 效果预览</li>
+        </ul>
+    </div>
+</body>
+</html>

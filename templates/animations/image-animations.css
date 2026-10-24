@@ -1,0 +1,403 @@
+/**
+ * 图片动画库 - Image Animations
+ *
+ * 包含：缩放、平移、渐显、Ken Burns 等效果
+ * 兼容 ffmpeg 视频渲染
+ */
+
+/* ========================================
+   1. 缩放入场 (Zoom In/Out)
+   ======================================== */
+
+@keyframes zoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes zoomInSlow {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes zoomOut {
+  from {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ========================================
+   2. 渐显动画 (Fade)
+   ======================================== */
+
+@keyframes imageFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes imageFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes imageFadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes imageFadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ========================================
+   3. Ken Burns 效果 (缓慢平移缩放)
+   ======================================== */
+
+@keyframes kenBurnsLeft {
+  0% {
+    transform: scale(1) translateX(0);
+  }
+  100% {
+    transform: scale(1.1) translateX(-5%);
+  }
+}
+
+@keyframes kenBurnsRight {
+  0% {
+    transform: scale(1) translateX(0);
+  }
+  100% {
+    transform: scale(1.1) translateX(5%);
+  }
+}
+
+@keyframes kenBurnsUp {
+  0% {
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    transform: scale(1.1) translateY(-5%);
+  }
+}
+
+@keyframes kenBurnsDown {
+  0% {
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    transform: scale(1.1) translateY(5%);
+  }
+}
+
+@keyframes kenBurnsZoom {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.15);
+  }
+}
+
+@keyframes kenBurnsZoomOut {
+  0% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes kenBurnsPan {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  25% {
+    transform: scale(1.05) translate(2%, 1%);
+  }
+  50% {
+    transform: scale(1.1) translate(-1%, -2%);
+  }
+  75% {
+    transform: scale(1.08) translate(-2%, 1%);
+  }
+  100% {
+    transform: scale(1.12) translate(1%, 0);
+  }
+}
+
+/* ========================================
+   4. 轻微浮动 (Subtle Float)
+   ======================================== */
+
+@keyframes imageFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes imageFloatScale {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-10px) scale(1.02);
+  }
+}
+
+/* ========================================
+   5. 图片边框动画 (Frame Animation)
+   ======================================== */
+
+@keyframes frameReveal {
+  from {
+    clip-path: inset(10% 10% 10% 10%);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes frameExpand {
+  from {
+    border-width: 0;
+  }
+  to {
+    border-width: 4px;
+  }
+}
+
+/* ========================================
+   6. 图片旋转 (Rotate)
+   ======================================== */
+
+@keyframes imageRotateIn {
+  from {
+    opacity: 0;
+    transform: rotate(-10deg) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+  }
+}
+
+@keyframes imageRotateSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ========================================
+   7. 图片滑入 (Slide)
+   ======================================== */
+
+@keyframes imageSlideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes imageSlideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes imageSlideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========================================
+   8. 脉冲效果 (Pulse)
+   ======================================== */
+
+@keyframes imagePulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.95;
+  }
+}
+
+/* ========================================
+   工具类 (Utility Classes)
+   ======================================== */
+
+.animate-image-zoom-in {
+  animation: zoomIn 1s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-image-zoom-in-slow {
+  animation: zoomInSlow 1.5s ease-out both;
+}
+
+.animate-image-zoom-out {
+  animation: zoomOut 1s ease-out both;
+}
+
+.animate-image-fade-in {
+  animation: imageFadeIn 1s ease-out both;
+}
+
+.animate-image-fade-in-up {
+  animation: imageFadeInUp 1s ease-out both;
+}
+
+.animate-image-fade-in-down {
+  animation: imageFadeInDown 1s ease-out both;
+}
+
+.animate-image-fade-in-scale {
+  animation: imageFadeInScale 1.2s ease-out both;
+}
+
+.animate-ken-burns-left {
+  animation: kenBurnsLeft 8s ease-in-out infinite alternate;
+}
+
+.animate-ken-burns-right {
+  animation: kenBurnsRight 8s ease-in-out infinite alternate;
+}
+
+.animate-ken-burns-up {
+  animation: kenBurnsUp 8s ease-in-out infinite alternate;
+}
+
+.animate-ken-burns-down {
+  animation: kenBurnsDown 8s ease-in-out infinite alternate;
+}
+
+.animate-ken-burns-zoom {
+  animation: kenBurnsZoom 10s ease-in-out infinite alternate;
+}
+
+.animate-ken-burns-zoom-out {
+  animation: kenBurnsZoomOut 10s ease-in-out infinite alternate;
+}
+
+.animate-ken-burns-pan {
+  animation: kenBurnsPan 12s ease-in-out infinite;
+}
+
+.animate-image-float {
+  animation: imageFloat 4s ease-in-out infinite;
+}
+
+.animate-image-float-scale {
+  animation: imageFloatScale 5s ease-in-out infinite;
+}
+
+.animate-frame-reveal {
+  animation: frameReveal 1.2s ease-out both;
+}
+
+.animate-frame-expand {
+  animation: frameExpand 0.8s ease-out both;
+}
+
+.animate-image-rotate-in {
+  animation: imageRotateIn 1s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-image-slide-in-left {
+  animation: imageSlideInLeft 1s ease-out both;
+}
+
+.animate-image-slide-in-right {
+  animation: imageSlideInRight 1s ease-out both;
+}
+
+.animate-image-slide-in-up {
+  animation: imageSlideInUp 1s ease-out both;
+}
+
+.animate-image-pulse {
+  animation: imagePulse 3s ease-in-out infinite;
+}
+
+/* 延迟类 */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+.delay-600 { animation-delay: 0.6s; }
+.delay-700 { animation-delay: 0.7s; }
+.delay-800 { animation-delay: 0.8s; }
+.delay-900 { animation-delay: 0.9s; }
+.delay-1000 { animation-delay: 1s; }
+.delay-1200 { animation-delay: 1.2s; }
+.delay-1500 { animation-delay: 1.5s; }
+.delay-2000 { animation-delay: 2s; }
+
+/* 时长类 */
+.duration-fast { animation-duration: 0.5s; }
+.duration-normal { animation-duration: 1s; }
+.duration-slow { animation-duration: 1.5s; }
+.duration-slower { animation-duration: 2s; }
+.duration-very-slow { animation-duration: 3s; }
