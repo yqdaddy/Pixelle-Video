@@ -145,6 +145,9 @@ class ConfigManager:
                     "voice": self.config.comfyui.tts.macos.voice,
                     "speed": self.config.comfyui.tts.macos.speed,
                 },
+                "piper": {
+                    "model_path": self.config.comfyui.tts.piper.model_path,
+                },
                 "comfyui": {
                     "default_workflow": self.config.comfyui.tts.comfyui.default_workflow,
                 },

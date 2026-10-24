@@ -302,6 +302,8 @@ class TTSService(ComfyBaseService):
         """
         # Get config defaults
         piper_config = self.config.get("piper", {})
+        logger.debug(f"Piper TTS config: self.config={self.config}")
+        logger.debug(f"Piper TTS piper_config={piper_config}")
 
         # Get model path from config
         model_path = piper_config.get("model_path")

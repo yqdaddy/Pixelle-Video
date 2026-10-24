@@ -91,14 +91,23 @@ class TTSMacOSConfig(BaseModel):
     )
 
 
+class TTSPiperConfig(BaseModel):
+    """Piper TTS configuration"""
+    model_path: str = Field(
+        default="model/piper/zh_CN-huayan-medium.onnx",
+        description="Path to Piper ONNX model file"
+    )
+
+
 class TTSSubConfig(BaseModel):
     """TTS-specific configuration (under comfyui.tts)"""
     inference_mode: str = Field(
         default="local",
-        description="TTS inference mode: 'local' (Edge TTS), 'macos' (macOS system TTS), or 'comfyui'"
+        description="TTS inference mode: 'local' (Edge TTS), 'macos' (macOS system TTS), 'piper' (Piper TTS), or 'comfyui'"
     )
     local: TTSLocalConfig = Field(default_factory=TTSLocalConfig, description="Local TTS (Edge TTS) configuration")
     macos: TTSMacOSConfig = Field(default_factory=TTSMacOSConfig, description="macOS TTS configuration")
+    piper: TTSPiperConfig = Field(default_factory=TTSPiperConfig, description="Piper TTS configuration")
     comfyui: TTSComfyUIConfig = Field(default_factory=TTSComfyUIConfig, description="ComfyUI TTS configuration")
     
     # Backward compatibility: keep default_workflow at top level
