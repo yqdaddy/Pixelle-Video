@@ -9,11 +9,13 @@ try:
     from .image_dashscope import DashScopeClient
     from .image_seedream import SeedreamClient
     from .image_gpt import ImageGPT
+    from .image_agnes import AgnesImageClient
     from .image_processor import ImageProcessor
 except ImportError:
     from .image_dashscope import DashScopeClient
     from .image_seedream import SeedreamClient
     from .image_gpt import ImageGPT
+    from .image_agnes import AgnesImageClient
     from .image_processor import ImageProcessor
 
 class ImageClient:
@@ -26,10 +28,13 @@ class ImageClient:
                  local_proxy: Optional[str] = None,
                  ark_api_key: Optional[str] = None,
                  ark_base_url: Optional[str] = None,
-                 ark_local_proxy: Optional[str] = None):
+                 ark_local_proxy: Optional[str] = None,
+                 agnes_api_key: Optional[str] = None,
+                 agnes_base_url: Optional[str] = None,
+                 agnes_local_proxy: Optional[str] = None):
         """
         Unified Image Generation Client
-        Routes requests to DashScope, Seedream, or GPT based on model name.
+        Routes requests to DashScope, Seedream, GPT, or Agnes based on model name.
         """
         self._dashscope_api_key = dashscope_api_key or Config.DASHSCOPE_API_KEY
         self._dashscope_base_url = dashscope_base_url or Config.DASHSCOPE_BASE_URL
@@ -43,9 +48,14 @@ class ImageClient:
         self._ark_base_url = ark_base_url or Config.ARK_BASE_URL
         self._ark_local_proxy = ark_local_proxy
 
+        self._agnes_api_key = agnes_api_key or Config.AGNES_API_KEY or os.getenv("AGNES_API_KEY")
+        self._agnes_base_url = agnes_base_url or Config.AGNES_BASE_URL or os.getenv("AGNES_BASE_URL")
+        self._agnes_local_proxy = agnes_local_proxy
+
         self._dashscope_client = None
         self._seedream_client = None
         self._gpt_client = None
+        self._agnes_client = None
 
         # Initialize Image Processor for downloads
         self.image_processor = ImageProcessor()
@@ -89,6 +99,17 @@ class ImageClient:
                 local_proxy=self._gpt_local_proxy,
             )
         return self._gpt_client
+
+    @property
+    def agnes_client(self):
+        """Create Agnes client only when an Agnes model is selected."""
+        if self._agnes_client is None:
+            self._agnes_client = AgnesImageClient(
+                api_key=self._agnes_api_key,
+                base_url=self._agnes_base_url,
+                local_proxy=self._agnes_local_proxy,
+            )
+        return self._agnes_client
 
     def generate_image(self,
                        prompt: str,
@@ -174,6 +195,7 @@ class ImageClient:
         # Determine backend provider
         is_seedream = "seedream" in model.lower()
         is_sora = "sora" in model.lower() or "gpt" in model.lower()
+        is_agnes = "agnes" in model.lower()
         
         # Prepare save directory
         if not save_dir:
@@ -229,6 +251,30 @@ class ImageClient:
 
             except Exception as e:
                 logging.error(f"GPT/Sora generation failed: {e}")
+
+        elif is_agnes:
+            # --- Agnes Logic ---
+            try:
+                logging.info(f"ImageClient requesting Agnes: {model}")
+                # Agnes uses size as "1K", "2K" etc. and ratio as "16:9", "1:1" etc.
+                # Map resolution to Agnes size format
+                agnes_size = resolution if resolution in ("1K", "2K") else "2K"
+
+                paths = self.agnes_client.generate_image(
+                    prompt=prompt,
+                    model=model,
+                    save_dir=save_dir,
+                    session_id=session_id or "default",
+                    size=agnes_size,
+                    ratio=video_ratio,
+                    image_paths=image_paths
+                )
+
+                if paths:
+                    generated_local_paths.extend(paths)
+
+            except Exception as e:
+                logging.error(f"Agnes generation failed: {e}")
 
         else:
             # --- DashScope Logic ---

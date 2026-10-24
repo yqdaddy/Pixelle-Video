@@ -14,6 +14,8 @@ dependencies = [
     "loguru>=0.7.0",
     "pyyaml>=6.0.0",
     "edge-tts==7.2.7",
+    "piper-tts>=1.2.0",
+    "onnxruntime>=1.19.0,<2.0.0",  # Compatible with macOS 12.0 x86_64
     "certifi>=2025.10.5",
     "ffmpeg-python>=0.2.0",
     "httpx>=0.28.1",
@@ -39,6 +41,20 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "ruff>=0.6.0",
 ]
+audio8 = [
+    "torch>=2.5.0",
+    "transformers>=4.57.0",
+    "soundfile>=0.12",
+    "safetensors>=0.4",
+    "torchaudio>=2.5.0",
+]
+
+# Note: Audio8_TTS uses PyTorch and supports CPU/GPU inference.
+# Install with:
+#   pip install -e ".[audio8]"
+# Model will be auto-downloaded on first use (~1.2GB)
+# Or pre-download:
+#   huggingface-cli download Audio8/Audio8-TTS-Preview-0.6b --local-dir model/audio8_tts
 
 [build-system]
 requires = ["hatchling"]

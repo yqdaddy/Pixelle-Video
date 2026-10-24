@@ -24,6 +24,7 @@ from loguru import logger
 from web.i18n import tr, get_language
 from web.utils.async_helpers import run_async
 from web.utils.streamlit_helpers import check_and_warn_selfhost_workflow
+from web.utils.form_persistence import get_persisted_value, update_form_value
 from web.pipelines.api_workflows import (
     list_api_media_workflows,
     list_local_media_workflows,
@@ -33,6 +34,7 @@ from web.pipelines.api_workflows import (
     workflow_source_label,
 )
 from pixelle_video.config import config_manager
+from pixelle_video.services.tts_macos import MACOS_VOICES
 
 
 def is_api_workflow(workflow_key: str | None) -> bool:
@@ -56,20 +58,31 @@ def render_style_config(pixelle_video):
         # Get TTS config
         comfyui_config = config_manager.get_comfyui_config()
         tts_config = comfyui_config["tts"]
-        
-        # Inference mode selection
+
+        # Use config value for tts_inference_mode (only for initial state)
+        config_tts_mode = tts_config.get("inference_mode", "local")
+
+        # Initialize session state from persisted value or config
+        if "tts_inference_mode" not in st.session_state:
+            persisted_tts_mode = get_persisted_value("tts_inference_mode", config_tts_mode)
+            st.session_state["tts_inference_mode"] = persisted_tts_mode
+
         tts_mode = st.radio(
             tr("tts.inference_mode"),
-            ["local", "comfyui"],
+            ["local", "macos", "comfyui"],
             horizontal=True,
             format_func=lambda x: tr(f"tts.mode.{x}"),
-            index=0 if tts_config.get("inference_mode", "local") == "local" else 1,
             key="tts_inference_mode"
         )
-        
+
+        # Save tts_mode to persistence
+        update_form_value("tts_inference_mode", tts_mode)
+
         # Show hint based on mode
         if tts_mode == "local":
             st.caption(tr("tts.mode.local_hint"))
+        elif tts_mode == "macos":
+            st.caption(tr("tts.mode.macos_hint"))
         else:
             st.caption(tr("tts.mode.comfyui_hint"))
         
@@ -79,30 +92,34 @@ def render_style_config(pixelle_video):
         if tts_mode == "local":
             # Import voice configuration
             from pixelle_video.tts_voices import EDGE_TTS_VOICES, get_voice_display_name
-            
+
             # Get saved voice from config
             local_config = tts_config.get("local", {})
             saved_voice = local_config.get("voice", "zh-CN-YunjianNeural")
             saved_speed = local_config.get("speed", 1.2)
-            
+
+            # Get persisted values (priority: session_state > persisted > config)
+            persisted_voice = get_persisted_value("tts_local_voice", saved_voice)
+            persisted_speed = get_persisted_value("tts_local_speed", saved_speed)
+
             # Build voice options with i18n
             voice_options = []
             voice_ids = []
             default_voice_index = 0
-            
+
             for idx, voice_config in enumerate(EDGE_TTS_VOICES):
                 voice_id = voice_config["id"]
                 display_name = get_voice_display_name(voice_id, tr, get_language())
                 voice_options.append(display_name)
                 voice_ids.append(voice_id)
-                
-                # Set default index if matches saved voice
-                if voice_id == saved_voice:
+
+                # Set default index if matches persisted voice
+                if voice_id == persisted_voice:
                     default_voice_index = idx
-            
+
             # Two-column layout: Voice | Speed
             voice_col, speed_col = st.columns([1, 1])
-            
+
             with voice_col:
                 # Voice selector
                 selected_voice_display = st.selectbox(
@@ -111,28 +128,93 @@ def render_style_config(pixelle_video):
                     index=default_voice_index,
                     key="tts_local_voice"
                 )
-                
+
                 # Get actual voice ID
                 selected_voice_index = voice_options.index(selected_voice_display)
                 selected_voice = voice_ids[selected_voice_index]
-            
+
+                # Save to persistence
+                update_form_value("tts_local_voice", selected_voice)
+
             with speed_col:
                 # Speed slider
                 tts_speed = st.slider(
                     tr("tts.speed"),
                     min_value=0.5,
                     max_value=2.0,
-                    value=saved_speed,
+                    value=persisted_speed,
                     step=0.1,
                     format="%.1fx",
                     key="tts_local_speed"
                 )
                 st.caption(tr("tts.speed_label", speed=f"{tts_speed:.1f}"))
+
+                # Save to persistence
+                update_form_value("tts_local_speed", tts_speed)
             
             # Variables for video generation
             tts_workflow_key = None
             ref_audio_path = None
-        
+
+        # ================================================================
+        # macOS TTS Mode UI
+        # ================================================================
+        elif tts_mode == "macos":
+            # Check if macOS TTS is available
+            from pixelle_video.services.tts_macos import MacOSTTSClient
+
+            if not MacOSTTSClient.is_available():
+                st.warning(
+                    "⚠️ macOS TTS 仅在 macOS 系统上可用。请使用本地合成（Edge TTS）或 ComfyUI 合成。"
+                    if get_language() == "zh_CN"
+                    else "⚠️ macOS TTS is only available on macOS. Please use Local Synthesis (Edge TTS) or ComfyUI Synthesis."
+                )
+                # Fallback to local mode
+                st.session_state["tts_inference_mode"] = "local"
+                st.rerun()
+
+            # Get saved voice from config
+            macos_config = tts_config.get("macos", {})
+            saved_voice = macos_config.get("voice", "Ting-Ting")
+
+            # Get persisted voice
+            persisted_voice = get_persisted_value("tts_macos_voice", saved_voice)
+
+            # Build voice options
+            voice_options = []
+            voice_names = []
+            default_voice_index = 0
+
+            for locale, voices in MACOS_VOICES.items():
+                for voice_id, voice_info in voices.items():
+                    display_name = voice_info.get("display_name", voice_info["name"])
+                    voice_options.append(display_name)
+                    voice_names.append(voice_info["name"])
+
+                    # Set default index if matches persisted voice
+                    if voice_info["name"] == persisted_voice:
+                        default_voice_index = len(voice_options) - 1
+
+            # Voice selector
+            selected_voice_display = st.selectbox(
+                tr("tts.voice_selector"),
+                voice_options,
+                index=default_voice_index,
+                key="tts_macos_voice"
+            )
+
+            # Get actual voice name
+            selected_voice_index = voice_options.index(selected_voice_display)
+            selected_voice = voice_names[selected_voice_index]
+
+            # Save to persistence
+            update_form_value("tts_macos_voice", selected_voice)
+
+            # Variables for video generation
+            tts_speed = 1.0  # macOS say doesn't support speed adjustment
+            tts_workflow_key = None
+            ref_audio_path = None
+
         # ================================================================
         # ComfyUI Mode UI
         # ================================================================
@@ -214,10 +296,12 @@ def render_style_config(pixelle_video):
                             "text": preview_text,
                             "inference_mode": tts_mode
                         }
-                        
+
                         if tts_mode == "local":
                             tts_params["voice"] = selected_voice
                             tts_params["speed"] = tts_speed
+                        elif tts_mode == "macos":
+                            tts_params["voice"] = selected_voice
                         else:  # comfyui
                             tts_params["workflow"] = tts_workflow_key
                             if ref_audio_path:
@@ -303,23 +387,31 @@ def render_style_config(pixelle_video):
         
         # Template type selector
         st.markdown(f"**{tr('template.type_selector')}**")
-        
+
         template_type_options = {
             'static': tr('template.type.static'),
             'image': tr('template.type.image'),
             'video': tr('template.type.video'),
         }
-        
+
+        # Get persisted template type (default to 'image')
+        persisted_template_type = get_persisted_value("template_type_selector", "image")
+        template_type_keys = list(template_type_options.keys())
+        default_type_index = template_type_keys.index(persisted_template_type) if persisted_template_type in template_type_keys else 1
+
         # Radio buttons in horizontal layout
         selected_template_type = st.radio(
             tr('template.type_selector'),
             options=list(template_type_options.keys()),
             format_func=lambda x: template_type_options[x],
-            index=1,  # Default to 'image'
+            index=default_type_index,
             key="template_type_selector",
             label_visibility="collapsed",
             horizontal=True
         )
+
+        # Save to persistence
+        update_form_value("template_type_selector", selected_template_type)
         
         # Display hint based on selected type (below radio buttons)
         if selected_template_type == 'static':
@@ -350,7 +442,7 @@ def render_style_config(pixelle_video):
         # Backward compatibility
         if config_default_template == "1080x1920/default.html":
             config_default_template = "1080x1920/image_default.html"
-        
+
         # Determine type-specific default template
         type_default_templates = {
             'static': '1080x1920/static_default.html',
@@ -358,17 +450,22 @@ def render_style_config(pixelle_video):
             'video': '1080x1920/video_default.html',
         }
         type_specific_default = type_default_templates.get(selected_template_type, config_default_template)
-        
+
         # Initialize selected template in session state if not exists
         if 'selected_template' not in st.session_state:
-            st.session_state['selected_template'] = type_specific_default
-        
+            # Try to load from persistence
+            persisted_template = get_persisted_value("selected_template", type_specific_default)
+            st.session_state['selected_template'] = persisted_template
+
         # Track last selected template type to detect type changes
         last_template_type = st.session_state.get('last_template_type', None)
         if last_template_type != selected_template_type:
             # Template type changed, reset to type-specific default
             st.session_state['selected_template'] = type_specific_default
             st.session_state['last_template_type'] = selected_template_type
+            # Save to persistence
+            update_form_value("selected_template", type_specific_default)
+            update_form_value("last_template_type", selected_template_type)
         
         # Collect size groups and prepare tabs
         size_groups = []
@@ -476,7 +573,7 @@ def render_style_config(pixelle_video):
                                 is_selected = (st.session_state['selected_template'] == template.template_path)
                                 button_label = f"{tr('template.selected')}" if is_selected else tr('template.select_button')
                                 button_type = "primary" if is_selected else "secondary"
-                                
+
                                 if st.button(
                                     button_label,
                                     key=f"template_{template.template_path}",
@@ -484,6 +581,8 @@ def render_style_config(pixelle_video):
                                     type=button_type,
                                 ):
                                     st.session_state['selected_template'] = template.template_path
+                                    # Save to persistence
+                                    update_form_value("selected_template", template.template_path)
                                     st.rerun()
             else:
                 st.warning(tr("template.no_templates_with_preview"))
@@ -720,22 +819,32 @@ def render_style_config(pixelle_video):
                 else:
                     st.markdown(tr("style.workflow_how"))
 
+            # Get persisted workflow source
+            workflow_source_key = "standard_video_workflow_source" if template_media_type == "video" else "standard_image_workflow_source"
+            persisted_workflow_source = get_persisted_value(workflow_source_key, "runninghub")
+
             source_options = ["runninghub", "selfhost", "api"]
             default_source_index = 0
             for index, source in enumerate(source_options):
-                if saved_workflow.startswith(f"{source}/"):
+                if persisted_workflow_source == source:
                     default_source_index = index
                     break
-            source_key = "standard_video_workflow_source" if template_media_type == "video" else "standard_image_workflow_source"
+                elif saved_workflow.startswith(f"{source}/"):
+                    default_source_index = index
+                    break
+
             workflow_source = st.radio(
                 "生成来源" if get_language() == "zh_CN" else "Generation source",
                 source_options,
                 index=default_source_index,
                 format_func=workflow_source_label,
                 horizontal=True,
-                key=source_key,
+                key=workflow_source_key,
                 help=workflow_source_help("快速创作媒体生成" if get_language() == "zh_CN" else "Quick Create media generation"),
             )
+
+            # Save to persistence
+            update_form_value(workflow_source_key, workflow_source)
 
             if workflow_source == "api":
                 if template_media_type == "video":
@@ -762,20 +871,25 @@ def render_style_config(pixelle_video):
             # Value: "runninghub/image_flux.json"
             workflow_options = [wf["display_name"] for wf in workflows]
             workflow_keys = [wf["key"] for wf in workflows]
-        
+
             # Default to first option (should be runninghub by sorting)
             default_workflow_index = 0
-        
-            # If user has a saved preference in config, try to match it
-            if saved_workflow and saved_workflow in workflow_keys:
+
+            # If user has a saved preference in config or persistence, try to match it
+            workflow_select_key = f"{workflow_source_key}_select"
+            persisted_workflow = get_persisted_value(workflow_select_key, saved_workflow)
+
+            if persisted_workflow and persisted_workflow in workflow_keys:
+                default_workflow_index = workflow_keys.index(persisted_workflow)
+            elif saved_workflow and saved_workflow in workflow_keys:
                 default_workflow_index = workflow_keys.index(saved_workflow)
-        
+
             workflow_display = st.selectbox(
                 "Workflow" if workflow_source != "api" else ("API 模型" if get_language() == "zh_CN" else "API model"),
                 workflow_options if workflow_options else ["No workflows found"],
                 index=default_workflow_index,
                 label_visibility="visible",
-                key=f"{source_key}_select",
+                key=workflow_select_key,
                 help=workflow_select_help(),
             )
         
@@ -784,6 +898,9 @@ def render_style_config(pixelle_video):
                 workflow_selected_index = workflow_options.index(workflow_display)
                 workflow_key = workflow_keys[workflow_selected_index]
                 workflow_info = workflows[workflow_selected_index]
+
+                # Save to persistence
+                update_form_value(workflow_select_key, workflow_key)
             else:
                 workflow_key = None
                 workflow_info = None
@@ -829,16 +946,23 @@ def render_style_config(pixelle_video):
             # Prompt prefix input
             # Get current prompt_prefix from config (based on media type)
             current_prefix = comfyui_config.get(media_config_key, {}).get("prompt_prefix", "")
-        
+
+            # Get persisted prompt prefix
+            persisted_prefix = get_persisted_value("prompt_prefix", current_prefix)
+
             # Prompt prefix input (temporary, not saved to config)
             prompt_prefix = st.text_area(
                 tr('style.prompt_prefix'),
-                value=current_prefix,
+                value=persisted_prefix,
                 placeholder=tr("style.prompt_prefix_placeholder"),
                 height=80,
                 label_visibility="visible",
-                help=tr("style.prompt_prefix_help")
+                help=tr("style.prompt_prefix_help"),
+                key="prompt_prefix"
             )
+
+            # Save to persistence
+            update_form_value("prompt_prefix", prompt_prefix)
         
             # Media preview expander
             preview_title = tr("style.video_preview_title") if template_media_type == "video" else tr("style.preview_title")
@@ -937,10 +1061,10 @@ def render_style_config(pixelle_video):
 
     return {
         "tts_inference_mode": tts_mode,
-        "tts_voice": selected_voice if tts_mode == "local" else None,
+        "tts_voice": selected_voice if tts_mode == "local" else (selected_voice if tts_mode == "macos" else None),
         "tts_speed": tts_speed if tts_mode == "local" else None,
         "tts_workflow": tts_workflow_key if tts_mode == "comfyui" else None,
-        "ref_audio": str(ref_audio_path) if ref_audio_path else None,
+        "ref_audio": str(ref_audio_path) if tts_mode == "comfyui" and ref_audio_path else None,
         "frame_template": frame_template,
         "template_params": custom_values_for_video if custom_values_for_video else None,
         "media_workflow": final_media_workflow,

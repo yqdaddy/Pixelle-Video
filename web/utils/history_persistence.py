@@ -11,6 +11,8 @@ from loguru import logger
 
 
 def _probe_video_duration(video_path: str) -> float:
+    """Probe video duration using ffprobe or ffmpeg as fallback."""
+    # Try ffprobe first
     cmd = [
         "ffprobe",
         "-v",
@@ -24,6 +26,33 @@ def _probe_video_duration(video_path: str) -> float:
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return float(result.stdout.strip())
+    except FileNotFoundError:
+        # ffprobe not found, try ffmpeg as fallback
+        logger.debug("ffprobe not found, trying ffmpeg as fallback")
+        try:
+            # ffmpeg -i video.mp4 2>&1 | grep "Duration"
+            result = subprocess.run(
+                ["ffmpeg", "-i", video_path],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            # Parse duration from stderr (ffmpeg outputs info to stderr)
+            for line in result.stderr.split("\n"):
+                if "Duration:" in line:
+                    # Format: "  Duration: 00:00:05.00, start: 0.000000, bitrate: ..."
+                    duration_str = line.split("Duration:")[1].split(",")[0].strip()
+                    # Parse HH:MM:SS.mmm
+                    parts = duration_str.split(":")
+                    if len(parts) == 3:
+                        hours = float(parts[0])
+                        minutes = float(parts[1])
+                        seconds = float(parts[2])
+                        return hours * 3600 + minutes * 60 + seconds
+            return 0.0
+        except Exception as exc:
+            logger.warning(f"Failed to probe video duration with ffmpeg: {exc}")
+            return 0.0
     except Exception as exc:
         logger.warning(f"Failed to probe video duration for {video_path}: {exc}")
         return 0.0

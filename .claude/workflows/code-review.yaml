@@ -1,0 +1,62 @@
+name: 代码审查工作流
+description: 多维度代码审查流程
+version: 1.0
+agents_dir: .claude/agents
+
+inputs:
+  - name: review_target
+    required: true
+    description: 审查目标（分支名/PR号/文件路径）
+  - name: review_focus
+    required: false
+    default: "correctness"
+    description: 审查重点（correctness/security/performance/all）
+
+steps:
+  - id: security_review
+    role: "dev-pv-reality-checker"
+    task: |
+      安全审查目标：{{review_target}}
+
+      检查项：
+      1. 输入验证与注入风险
+      2. 密钥/敏感信息泄露
+      3. 权限与鉴权漏洞
+
+      输出：安全问题清单（含严重级别）
+    output: security_report
+
+  - id: quality_review
+    role: "dev-pv-backend-architect"
+    task: |
+      质量审查目标：{{review_target}}
+      审查重点：{{review_focus}}
+
+      检查项：
+      1. 正确性（逻辑错误、边界条件）
+      2. 可维护性（命名、结构、重复代码）
+      3. 性能（明显瓶颈）
+
+      输出：质量问题清单（含位置与建议）
+    output: quality_report
+    # 与 security_review 并行（无依赖关系）
+
+  - id: final_verification
+    role: "dev-pv-reality-checker"
+    task: |
+      汇总审查结论（你不参与审查，只做终审裁定）：
+
+      安全报告：{{security_report}}
+      质量报告：{{quality_report}}
+
+      输出：
+      1. 汇总结论（通过 / 需修复后通过 / 不通过）
+      2. 必须修复项（P0/P1）
+      3. 建议改进项
+    output: review_conclusion
+    depends_on: [security_review, quality_review]
+
+outputs:
+  - security_report
+  - quality_report
+  - review_conclusion

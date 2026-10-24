@@ -18,22 +18,27 @@ import streamlit as st
 
 from web.i18n import tr
 from web.utils.async_helpers import get_project_version
+from web.utils.form_persistence import get_persisted_value, update_form_value
 
 
 def render_content_input():
     """Render content input section (left column) with batch support"""
     with st.container(border=True):
         st.markdown(f"**{tr('section.content_input')}**")
-        
+
         # ====================================================================
         # Step 1: Batch mode toggle (highest priority)
         # ====================================================================
         batch_mode = st.checkbox(
             tr("batch.mode_label"),
-            value=False,
-            help=tr("batch.mode_help")
+            value=get_persisted_value("batch_mode", False),
+            help=tr("batch.mode_help"),
+            key="batch_mode"
         )
-        
+
+        # Save batch_mode to persistence
+        update_form_value("batch_mode", batch_mode)
+
         if not batch_mode:
             # ================================================================
             # Single task mode (original logic, unchanged)
@@ -44,21 +49,30 @@ def render_content_input():
                 ["generate", "fixed"],
                 horizontal=True,
                 format_func=lambda x: tr(f"mode.{x}"),
-                label_visibility="collapsed"
+                label_visibility="collapsed",
+                key="processing_mode"
             )
-            
+
+            # Save mode to persistence
+            update_form_value("processing_mode", mode)
+
             # Text input (unified for both modes)
             text_placeholder = tr("input.topic_placeholder") if mode == "generate" else tr("input.content_placeholder")
             text_height = 120 if mode == "generate" else 200
             text_help = tr("input.text_help_generate") if mode == "generate" else tr("input.text_help_fixed")
-            
+
             text = st.text_area(
                 tr("input.text"),
+                value=get_persisted_value("input_text", ""),
                 placeholder=text_placeholder,
                 height=text_height,
-                help=text_help
+                help=text_help,
+                key="input_text"
             )
-            
+
+            # Save text to persistence
+            update_form_value("input_text", text)
+
             # Split mode selector (only show in fixed mode)
             if mode == "fixed":
                 split_mode_options = {
@@ -70,35 +84,46 @@ def render_content_input():
                     tr("split.mode_label"),
                     options=list(split_mode_options.keys()),
                     format_func=lambda x: split_mode_options[x],
-                    index=0,  # Default to paragraph mode
-                    help=tr("split.mode_help")
+                    index=list(split_mode_options.keys()).index(get_persisted_value("split_mode", "paragraph")),
+                    help=tr("split.mode_help"),
+                    key="split_mode"
                 )
+                # Save split_mode to persistence
+                update_form_value("split_mode", split_mode)
             else:
                 split_mode = "paragraph"  # Default for generate mode (not used)
-            
+
             # Title input (optional for both modes)
             title = st.text_input(
                 tr("input.title"),
+                value=get_persisted_value("input_title", ""),
                 placeholder=tr("input.title_placeholder"),
-                help=tr("input.title_help")
+                help=tr("input.title_help"),
+                key="input_title"
             )
-            
+
+            # Save title to persistence
+            update_form_value("input_title", title)
+
             # Number of scenes (only show in generate mode)
             if mode == "generate":
                 n_scenes = st.slider(
                     tr("video.frames"),
                     min_value=3,
                     max_value=30,
-                    value=5,
+                    value=get_persisted_value("n_scenes", 5),
                     help=tr("video.frames_help"),
-                    label_visibility="collapsed"
+                    label_visibility="collapsed",
+                    key="n_scenes"
                 )
                 st.caption(tr("video.frames_label", n=n_scenes))
+                # Save n_scenes to persistence
+                update_form_value("n_scenes", n_scenes)
             else:
                 # Fixed mode: n_scenes is ignored, set default value
                 n_scenes = 5
                 st.info(tr("video.frames_fixed_mode_hint"))
-            
+
             return {
                 "batch_mode": False,
                 "mode": mode,
@@ -113,7 +138,7 @@ def render_content_input():
             # Batch mode (simplified YAGNI version)
             # ================================================================
             st.markdown(f"**{tr('batch.section_title')}**")
-            
+
             # Batch rules info
             st.info(f"""
 **{tr('batch.rules_title')}**
@@ -121,24 +146,29 @@ def render_content_input():
 - ✅ {tr('batch.rule_2')}
 - ✅ {tr('batch.rule_3')}
             """)
-            
+
             # Batch topics input
             text_input = st.text_area(
                 tr("batch.topics_label"),
                 height=300,
+                value=get_persisted_value("batch_topics_text", ""),
                 placeholder=tr("batch.topics_placeholder"),
-                help=tr("batch.topics_help")
+                help=tr("batch.topics_help"),
+                key="batch_topics_text"
             )
-            
+
+            # Save to persistence
+            update_form_value("batch_topics_text", text_input)
+
             # Split topics by newline
             if text_input:
                 # Simple split by newline, filter empty lines
                 topics = [
-                    line.strip() 
-                    for line in text_input.strip().split('\n') 
+                    line.strip()
+                    for line in text_input.strip().split('\n')
                     if line.strip()
                 ]
-                
+
                 if topics:
                     # Check count limit
                     if len(topics) > 100:
@@ -146,7 +176,7 @@ def render_content_input():
                         topics = []
                     else:
                         st.success(tr("batch.count_success", count=len(topics)))
-                        
+
                         # Preview topics list
                         with st.expander(tr("batch.preview_title"), expanded=False):
                             for i, topic in enumerate(topics, 1):
@@ -155,29 +185,38 @@ def render_content_input():
                     topics = []
             else:
                 topics = []
-            
+
             st.markdown("---")
-            
+
             # Title prefix (optional)
             title_prefix = st.text_input(
                 tr("batch.title_prefix_label"),
+                value=get_persisted_value("batch_title_prefix", ""),
                 placeholder=tr("batch.title_prefix_placeholder"),
-                help=tr("batch.title_prefix_help")
+                help=tr("batch.title_prefix_help"),
+                key="batch_title_prefix"
             )
-            
+
+            # Save to persistence
+            update_form_value("batch_title_prefix", title_prefix)
+
             # Number of scenes (unified for all videos)
             n_scenes = st.slider(
                 tr("batch.n_scenes_label"),
                 min_value=3,
                 max_value=30,
-                value=5,
-                help=tr("batch.n_scenes_help")
+                value=get_persisted_value("batch_n_scenes", 5),
+                help=tr("batch.n_scenes_help"),
+                key="batch_n_scenes"
             )
             st.caption(tr("batch.n_scenes_caption", n=n_scenes))
-            
+
+            # Save to persistence
+            update_form_value("batch_n_scenes", n_scenes)
+
             # Config info
             st.info(f"📌 {tr('batch.config_info')}")
-            
+
             return {
                 "batch_mode": True,
                 "topics": topics,
@@ -191,16 +230,16 @@ def render_bgm_section(key_prefix=""):
     """Render BGM selection section"""
     with st.container(border=True):
         st.markdown(f"**{tr('section.bgm')}**")
-        
+
         with st.expander(tr("help.feature_description"), expanded=False):
             st.markdown(f"**{tr('help.what')}**")
             st.markdown(tr("bgm.what"))
             st.markdown(f"**{tr('help.how')}**")
             st.markdown(tr("bgm.how"))
-        
+
         # Dynamically scan bgm folder for music files (merged from bgm/ and data/bgm/)
         from pixelle_video.utils.os_util import list_resource_files
-        
+
         try:
             all_files = list_resource_files("bgm")
             # Filter to audio files only
@@ -209,15 +248,20 @@ def render_bgm_section(key_prefix=""):
         except Exception as e:
             st.warning(f"Failed to load BGM files: {e}")
             bgm_files = []
-        
+
         # Add special "None" option
         bgm_options = [tr("bgm.none")] + bgm_files
-        
+
         # Default to "default.mp3" if exists, otherwise first option
         default_index = 0
         if "default.mp3" in bgm_files:
             default_index = bgm_options.index("default.mp3")
-        
+
+        # Get persisted BGM choice
+        persisted_bgm = get_persisted_value(f"{key_prefix}bgm_choice", bgm_options[default_index])
+        if persisted_bgm in bgm_options:
+            default_index = bgm_options.index(persisted_bgm)
+
         bgm_choice = st.selectbox(
             "BGM",
             bgm_options,
@@ -225,22 +269,27 @@ def render_bgm_section(key_prefix=""):
             label_visibility="collapsed",
             key=f"{key_prefix}bgm_selector"
         )
-        
+
+        # Save to persistence
+        update_form_value(f"{key_prefix}bgm_choice", bgm_choice)
+
         # BGM volume slider (only show when BGM is selected)
         if bgm_choice != tr("bgm.none"):
             bgm_volume = st.slider(
                 tr("bgm.volume"),
                 min_value=0.0,
                 max_value=0.5,
-                value=0.2,
+                value=get_persisted_value(f"{key_prefix}bgm_volume", 0.2),
                 step=0.01,
                 format="%.2f",
                 key=f"{key_prefix}bgm_volume_slider",
                 help=tr("bgm.volume_help")
             )
+            # Save to persistence
+            update_form_value(f"{key_prefix}bgm_volume", bgm_volume)
         else:
             bgm_volume = 0.2  # Default value when no BGM selected
-        
+
         # BGM preview button (only if BGM is not "None")
         if bgm_choice != tr("bgm.none"):
             if st.button(tr("bgm.preview"), key=f"{key_prefix}preview_bgm", use_container_width=True):
@@ -253,10 +302,10 @@ def render_bgm_section(key_prefix=""):
                         st.error(tr("bgm.preview_failed", file=bgm_choice))
                 except Exception as e:
                     st.error(f"{tr('bgm.preview_failed', file=bgm_choice)}: {e}")
-        
+
         # Use full filename for bgm_path (including extension)
         bgm_path = None if bgm_choice == tr("bgm.none") else bgm_choice
-    
+
     return {
         "bgm_path": bgm_path,
         "bgm_volume": bgm_volume

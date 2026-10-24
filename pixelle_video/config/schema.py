@@ -47,6 +47,13 @@ class AccessSecretProviderConfig(BaseModel):
     use_proxy: bool = Field(default=False, description="Route provider requests through common local proxy")
 
 
+class AgnesProviderConfig(BaseModel):
+    """Agnes AI Provider 配置"""
+    api_key: str = Field(default="", description="Agnes API Key")
+    base_url: str = Field(default="https://api.agnes-ai.cn/v1", description="Agnes API Base URL")
+    use_proxy: bool = Field(default=False, description="通过 common.local_proxy 路由请求")
+
+
 class APIProvidersConfig(BaseModel):
     """Direct model provider API configuration"""
     common: APIProviderCommonConfig = Field(default_factory=APIProviderCommonConfig)
@@ -56,6 +63,7 @@ class APIProvidersConfig(BaseModel):
     gemini: APIKeyProviderConfig = Field(default_factory=APIKeyProviderConfig)
     ark: APIKeyProviderConfig = Field(default_factory=APIKeyProviderConfig)
     kling: AccessSecretProviderConfig = Field(default_factory=AccessSecretProviderConfig)
+    agnes: AgnesProviderConfig = Field(default_factory=AgnesProviderConfig)
 
 
 class TTSLocalConfig(BaseModel):
@@ -69,10 +77,28 @@ class TTSComfyUIConfig(BaseModel):
     default_workflow: Optional[str] = Field(default=None, description="Default TTS workflow (optional)")
 
 
+class TTSMacOSConfig(BaseModel):
+    """macOS system TTS configuration"""
+    voice: str = Field(
+        default="Ting-Ting",
+        description="macOS voice name (e.g., Ting-Ting, Sin-ji, Mei-Jia)"
+    )
+    speed: float = Field(
+        default=1.0,
+        ge=0.5,
+        le=2.0,
+        description="Speech speed multiplier (not supported by macOS say command, kept for API compatibility)"
+    )
+
+
 class TTSSubConfig(BaseModel):
     """TTS-specific configuration (under comfyui.tts)"""
-    inference_mode: str = Field(default="local", description="TTS inference mode: 'local' or 'comfyui'")
+    inference_mode: str = Field(
+        default="local",
+        description="TTS inference mode: 'local' (Edge TTS), 'macos' (macOS system TTS), or 'comfyui'"
+    )
     local: TTSLocalConfig = Field(default_factory=TTSLocalConfig, description="Local TTS (Edge TTS) configuration")
+    macos: TTSMacOSConfig = Field(default_factory=TTSMacOSConfig, description="macOS TTS configuration")
     comfyui: TTSComfyUIConfig = Field(default_factory=TTSComfyUIConfig, description="ComfyUI TTS configuration")
     
     # Backward compatibility: keep default_workflow at top level

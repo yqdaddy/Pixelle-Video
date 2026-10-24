@@ -52,7 +52,28 @@ comfyui:
   
   # TTS-specific configuration
   tts:
-    default_workflow: selfhost/tts_edge.json  # TTS workflow to use
+    # TTS inference mode: "local" (Edge TTS), "macos" (macOS system TTS), "piper" (offline TTS), or "comfyui"
+    inference_mode: piper
+
+    # Local TTS (Edge TTS) configuration
+    local:
+      voice: zh-CN-YunjianNeural  # Edge TTS voice ID
+      speed: 1.2  # Speech speed multiplier (0.5-2.0)
+
+    # macOS TTS configuration (only available on macOS)
+    macos:
+      voice: Ting-Ting  # macOS voice name (e.g., Ting-Ting, Sin-ji, Mei-Jia, Samantha)
+      speed: 1.0  # Not supported by macOS say command, kept for API compatibility
+
+    # Piper TTS configuration (offline, requires piper-tts)
+    piper:
+      model_path: model/piper/zh_CN-huayan-medium.onnx  # Piper model file path (.onnx)
+      # Available models: https://huggingface.co/rhasspy/piper-voices
+      # Chinese models: zh_CN-huayan-medium.onnx
+
+    # ComfyUI TTS configuration
+    comfyui:
+      default_workflow: selfhost/tts_edge.json  # TTS workflow to use
   
   # Image-specific configuration
   image:

@@ -11,7 +11,7 @@
 # limitations under the License.
 
 """
-TTS (Text-to-Speech) Service - Supports both local and ComfyUI inference
+TTS (Text-to-Speech) Service - Supports local Edge TTS, macOS system TTS, Piper TTS, and ComfyUI inference
 """
 
 import os
@@ -30,19 +30,19 @@ from pixelle_video.tts_voices import speed_to_rate
 class TTSService(ComfyBaseService):
     """
     TTS (Text-to-Speech) service - Workflow-based
-    
+
     Uses ComfyKit to execute TTS workflows.
-    
+
     Usage:
         # Use default workflow
         audio_path = await pixelle_video.tts(text="Hello, world!")
-        
+
         # Use specific workflow
         audio_path = await pixelle_video.tts(
             text="你好，世界！",
             workflow="tts_edge.json"
         )
-        
+
         # List available workflows
         workflows = pixelle_video.tts.list_workflows()
     """
@@ -79,22 +79,22 @@ class TTSService(ComfyBaseService):
         **params
     ) -> str:
         """
-        Generate speech using local Edge TTS or ComfyUI workflow
-        
+        Generate speech using local Edge TTS, macOS system TTS, Piper TTS, or ComfyUI workflow
+
         Args:
             text: Text to convert to speech
             workflow: Workflow filename (for ComfyUI mode, default: from config)
             comfyui_url: ComfyUI URL (optional, overrides config)
             runninghub_api_key: RunningHub API key (optional, overrides config)
-            voice: Voice ID (for local mode: Edge TTS voice ID; for ComfyUI: workflow-specific)
-            speed: Speech speed multiplier (1.0 = normal, >1.0 = faster, <1.0 = slower)
-            inference_mode: Override inference mode ("local" or "comfyui", default: from config)
+            voice: Voice ID (for local mode: Edge TTS voice ID; for macOS: voice name; for Piper: voice name; for ComfyUI: workflow-specific)
+            speed: Speech speed multiplier (for local mode only, 1.0 = normal, >1.0 = faster, <1.0 = slower)
+            inference_mode: Override inference mode ("local", "macos", "piper", or "comfyui", default: from config)
             output_path: Custom output path (auto-generated if None)
             **params: Additional workflow parameters
-        
+
         Returns:
             Generated audio file path
-        
+
         Examples:
             # Local inference (Edge TTS)
             audio_path = await pixelle_video.tts(
@@ -103,7 +103,20 @@ class TTSService(ComfyBaseService):
                 voice="zh-CN-YunjianNeural",
                 speed=1.2
             )
-            
+
+            # macOS system TTS
+            audio_path = await pixelle_video.tts(
+                text="你好，世界！",
+                inference_mode="macos",
+                voice="Ting-Ting"
+            )
+
+            # Piper TTS (offline)
+            audio_path = await pixelle_video.tts(
+                text="你好，世界！",
+                inference_mode="piper"
+            )
+
             # ComfyUI inference
             audio_path = await pixelle_video.tts(
                 text="你好，世界！",
@@ -113,7 +126,8 @@ class TTSService(ComfyBaseService):
         """
         # Determine inference mode (param > config)
         mode = inference_mode or self.config.get("inference_mode", "local")
-        
+        logger.debug(f"🎤 TTS inference_mode param={inference_mode}, config={self.config.get('inference_mode')}, final mode={mode}")
+
         # Route to appropriate implementation
         if mode == "local":
             return await self._call_local_tts(
@@ -122,10 +136,22 @@ class TTSService(ComfyBaseService):
                 speed=speed,
                 output_path=output_path
             )
+        elif mode == "macos":
+            return await self._call_macos_tts(
+                text=text,
+                voice=voice,
+                output_path=output_path
+            )
+        elif mode == "piper":
+            return await self._call_piper_tts(
+                text=text,
+                voice=voice,
+                output_path=output_path
+            )
         else:  # comfyui
             # 1. Resolve workflow (returns structured info)
             workflow_info = self._resolve_workflow(workflow=workflow)
-            
+
             # 2. Execute ComfyUI workflow
             return await self._call_comfyui_workflow(
                 workflow_info=workflow_info,
@@ -192,6 +218,138 @@ class TTSService(ComfyBaseService):
         
         except Exception as e:
             logger.error(f"Local TTS generation error: {e}")
+            raise
+
+    async def _call_macos_tts(
+        self,
+        text: str,
+        voice: Optional[str] = None,
+        output_path: Optional[str] = None,
+    ) -> str:
+        """
+        Generate speech using macOS system TTS
+
+        Args:
+            text: Text to convert to speech
+            voice: macOS voice name (default: from config, Ting-Ting)
+            output_path: Custom output path (auto-generated if None)
+
+        Returns:
+            Generated audio file path
+        """
+        # Get config defaults
+        macos_config = self.config.get("macos", {})
+
+        # Determine voice (param > config)
+        final_voice = voice or macos_config.get("voice", "Ting-Ting")
+
+        logger.info(f"🎙️  Using macOS system TTS: voice={final_voice}")
+
+        # Generate output path if not provided
+        if not output_path:
+            unique_id = uuid.uuid4().hex
+            output_path = f"output/{unique_id}.mp3"
+
+            # Ensure output directory exists
+            Path("output").mkdir(parents=True, exist_ok=True)
+
+        try:
+            # Import macOS TTS client
+            from pixelle_video.services.tts_macos import get_macos_tts_client
+
+            # Get client
+            client = get_macos_tts_client()
+
+            # Call macOS TTS
+            audio_path = await client.synthesize_async(
+                text=text,
+                voice=final_voice,
+                output_path=output_path
+            )
+
+            logger.info(f"✅ Generated audio (macOS TTS): {audio_path}")
+            return audio_path
+
+        except ImportError as e:
+            logger.error(f"macOS TTS not available: {e}")
+            raise ImportError(
+                "macOS TTS is only available on macOS. "
+                "Please use Edge TTS (inference_mode='local') or ComfyUI TTS."
+            )
+        except RuntimeError as e:
+            logger.error(f"macOS TTS error: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"macOS TTS generation error: {e}")
+            raise
+
+    async def _call_piper_tts(
+        self,
+        text: str,
+        voice: Optional[str] = None,
+        output_path: Optional[str] = None,
+    ) -> str:
+        """
+        Generate speech using Piper TTS
+
+        Args:
+            text: Text to convert to speech
+            voice: Piper voice name (ignored for now, uses configured model)
+            output_path: Custom output path (auto-generated if None)
+
+        Returns:
+            Generated audio file path
+        """
+        # Get config defaults
+        piper_config = self.config.get("piper", {})
+
+        # Get model path from config
+        model_path = piper_config.get("model_path")
+        if not model_path:
+            logger.error("Piper model path not configured")
+            raise ValueError(
+                "Piper model path not configured. "
+                "Please set config.comfyui.tts.piper.model_path"
+            )
+
+        logger.info(f"🎙️  Using Piper TTS: model={Path(model_path).stem}")
+
+        # Generate output path if not provided
+        if not output_path:
+            unique_id = uuid.uuid4().hex
+            output_path = f"output/{unique_id}.mp3"
+
+            # Ensure output directory exists
+            Path("output").mkdir(parents=True, exist_ok=True)
+
+        try:
+            # Import Piper TTS client
+            from pixelle_video.services.tts_piper import get_piper_tts_client
+
+            # Get client
+            client = get_piper_tts_client(model_path=model_path)
+
+            # Call Piper TTS
+            audio_path = await client.synthesize_async(
+                text=text,
+                voice=voice,
+                output_path=output_path
+            )
+
+            logger.info(f"✅ Generated audio (Piper TTS): {audio_path}")
+            return audio_path
+
+        except ImportError as e:
+            logger.error(f"Piper TTS not available: {e}")
+            raise ImportError(
+                "Piper TTS is not installed. "
+                "Install with: pip install piper-tts"
+            )
+        except FileNotFoundError as e:
+            logger.error(f"Piper model not found: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Piper TTS generation error: {e}")
             raise
     
     async def _call_comfyui_workflow(

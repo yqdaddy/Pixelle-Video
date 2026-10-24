@@ -41,6 +41,82 @@ from pixelle_video.utils.os_util import (
 )
 
 
+def _probe_media_duration(file_path: str) -> float:
+    """
+    Get media duration using ffmpeg (works without ffprobe).
+
+    Args:
+        file_path: Path to audio or video file
+
+    Returns:
+        Duration in seconds, or 0.0 on failure
+    """
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-i", file_path],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        for line in result.stderr.split("\n"):
+            if "Duration:" in line:
+                duration_str = line.split("Duration:")[1].split(",")[0].strip()
+                parts = duration_str.split(":")
+                if len(parts) == 3:
+                    hours = float(parts[0])
+                    minutes = float(parts[1])
+                    seconds = float(parts[2])
+                    return hours * 3600 + minutes * 60 + seconds
+    except Exception:
+        pass
+    return 0.0
+
+
+def _probe_media_streams(file_path: str) -> dict:
+    """
+    Get media stream info using ffmpeg (works without ffprobe).
+    """
+    import subprocess
+    import re
+    result = {'duration': 0.0, 'video': {}, 'audio': {}}
+
+    try:
+        proc = subprocess.run(
+            ["ffmpeg", "-i", file_path],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        output = proc.stderr
+
+        for line in output.split("\n"):
+            if "Duration:" in line:
+                duration_str = line.split("Duration:")[1].split(",")[0].strip()
+                parts = duration_str.split(":")
+                if len(parts) == 3:
+                    hours = float(parts[0])
+                    minutes = float(parts[1])
+                    seconds = float(parts[2])
+                    result['duration'] = hours * 3600 + minutes * 60 + seconds
+
+            if "Video:" in line:
+                res_match = re.search(r'(\d+)x(\d+)', line)
+                if res_match:
+                    result['video'] = {
+                        'width': int(res_match.group(1)),
+                        'height': int(res_match.group(2)),
+                        'codec_type': 'video'
+                    }
+
+            if "Audio:" in line:
+                result['audio'] = {'codec_type': 'audio'}
+
+        return result
+    except Exception:
+        return result
+
+
 def check_ffmpeg() -> None:
     """
     Check if FFmpeg is installed on the system
@@ -253,29 +329,75 @@ class VideoService:
             raise RuntimeError(f"Failed to concatenate videos: {e}")
     
     def _get_video_duration(self, video: str) -> float:
-        """Get video duration in seconds"""
+        """Get video duration in seconds using ffmpeg"""
         try:
-            probe = ffmpeg.probe(video)
-            duration = float(probe['format']['duration'])
+            # Try ffmpeg.probe first (requires ffprobe)
+            duration = _probe_media_duration(video)
+            pass
             return duration
         except Exception as e:
-            logger.warning(f"Failed to get video duration: {e}")
-            return 0.0
+            logger.debug(f"ffmpeg.probe failed, using ffmpeg directly: {e}")
+            # Fallback: parse duration from ffmpeg output
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ["ffmpeg", "-i", video],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                for line in result.stderr.split("\n"):
+                    if "Duration:" in line:
+                        duration_str = line.split("Duration:")[1].split(",")[0].strip()
+                        parts = duration_str.split(":")
+                        if len(parts) == 3:
+                            hours = float(parts[0])
+                            minutes = float(parts[1])
+                            seconds = float(parts[2])
+                            return hours * 3600 + minutes * 60 + seconds
+                return 0.0
+            except Exception as e2:
+                logger.warning(f"Failed to get video duration: {e2}")
+                return 0.0
     
     def _get_audio_duration(self, audio: str) -> float:
-        """Get audio duration in seconds"""
+        """Get audio duration in seconds using ffmpeg"""
         try:
-            probe = ffmpeg.probe(audio)
-            duration = float(probe['format']['duration'])
+            # Try ffmpeg.probe first (requires ffprobe)
+            duration = _probe_media_duration(audio)
+            pass
             return duration
         except Exception as e:
-            logger.warning(f"Failed to get audio duration: {e}, using estimate")
-            # Fallback: estimate based on file size (very rough)
-            import os
-            file_size = os.path.getsize(audio)
-            # Assume ~16kbps for MP3, so 2KB per second
-            estimated_duration = file_size / 2000
-            return max(1.0, estimated_duration)  # At least 1 second
+            logger.debug(f"ffmpeg.probe failed, using ffmpeg directly: {e}")
+            # Fallback: parse duration from ffmpeg output
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ["ffmpeg", "-i", audio],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                # Parse duration from stderr
+                for line in result.stderr.split("\n"):
+                    if "Duration:" in line:
+                        # Format: "  Duration: 00:00:05.00, start: 0.000000, bitrate: ..."
+                        duration_str = line.split("Duration:")[1].split(",")[0].strip()
+                        parts = duration_str.split(":")
+                        if len(parts) == 3:
+                            hours = float(parts[0])
+                            minutes = float(parts[1])
+                            seconds = float(parts[2])
+                            return hours * 3600 + minutes * 60 + seconds
+
+                # Last fallback: estimate based on file size
+                logger.warning("Could not parse duration from ffmpeg output, using file size estimate")
+                file_size = os.path.getsize(audio)
+                estimated_duration = file_size / 2000  # ~2KB per second for MP3
+                return max(1.0, estimated_duration)
+            except Exception as e2:
+                logger.warning(f"Failed to get audio duration: {e2}")
+                return 5.0  # Default fallback
     
     def has_audio_stream(self, video: str) -> bool:
         """
@@ -288,7 +410,7 @@ class VideoService:
             True if video has audio stream, False otherwise
         """
         try:
-            probe = ffmpeg.probe(video)
+            duration = _probe_media_duration(video)
             audio_streams = [s for s in probe.get('streams', []) if s['codec_type'] == 'audio']
             has_audio = len(audio_streams) > 0
             logger.debug(f"Video {video} has_audio={has_audio}")
@@ -404,13 +526,11 @@ class VideoService:
             else:  # black
                 # Generate black frames for padding duration
                 # Get video properties
-                probe = ffmpeg.probe(video)
-                video_info = next(s for s in probe['streams'] if s['codec_type'] == 'video')
-                width = int(video_info['width'])
-                height = int(video_info['height'])
-                fps_str = video_info['r_frame_rate']
-                fps_num, fps_den = map(int, fps_str.split('/'))
-                fps = fps_num / fps_den if fps_den != 0 else 30
+                duration = _probe_media_duration(video)
+                video_info = _probe_media_streams(video).get('video', {})
+                width = int(video_info.get('width', 1080))
+                height = int(video_info.get('height', 1920))
+                fps = 30  # Default fps
                 
                 # Create black video for padding
                 black_video_path = self._get_unique_temp_path("black_pad", os.path.basename(output))
@@ -547,10 +667,10 @@ class VideoService:
         
         try:
             # Get overlay image dimensions
-            overlay_probe = ffmpeg.probe(overlay_image)
-            overlay_stream = next(s for s in overlay_probe['streams'] if s['codec_type'] == 'video')
-            overlay_width = int(overlay_stream['width'])
-            overlay_height = int(overlay_stream['height'])
+            overlay_duration = _probe_media_duration(overlay_image)
+            overlay_info = _probe_media_streams(overlay_image).get('video', {})
+            overlay_width = int(overlay_info.get('width', 1080))
+            overlay_height = int(overlay_info.get('height', 1920))
             
             logger.debug(f"Overlay dimensions: {overlay_width}x{overlay_height}")
             
@@ -634,11 +754,10 @@ class VideoService:
         """
         self._ensure_ffmpeg()
         logger.info("Creating video from image and audio")
-        
+
         try:
             # Get audio duration to ensure exact video duration match
-            probe = ffmpeg.probe(audio)
-            audio_duration = float(probe['format']['duration'])
+            audio_duration = _probe_media_duration(audio)
             logger.debug(f"Audio duration: {audio_duration:.3f}s")
             
             # Input image with loop (loop=1 means loop indefinitely)
@@ -965,14 +1084,12 @@ class VideoService:
             else:  # black
                 # Generate black frames for padding duration
                 # Get video properties
-                probe = ffmpeg.probe(video)
-                video_info = next(s for s in probe['streams'] if s['codec_type'] == 'video')
-                width = int(video_info['width'])
-                height = int(video_info['height'])
-                fps_str = video_info['r_frame_rate']
-                fps_num, fps_den = map(int, fps_str.split('/'))
-                fps = fps_num / fps_den if fps_den != 0 else 30
-                
+                duration = _probe_media_duration(video)
+                video_info = _probe_media_streams(video).get('video', {})
+                width = int(video_info.get('width', 1080))
+                height = int(video_info.get('height', 1920))
+                fps = 30  # Default fps
+
                 # Create black video for padding
                 black_input = ffmpeg.input(
                     f'color=c=black:s={width}x{height}:r={fps}',

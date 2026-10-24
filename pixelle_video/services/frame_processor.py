@@ -443,23 +443,32 @@ class FrameProcessor:
         frame.video_segment_path = segment_path
         
         logger.debug(f"  ✓ Video segment created: {segment_path}")
-    
+
     async def _get_audio_duration(self, audio_path: str) -> float:
-        """Get audio duration in seconds"""
+        """Get audio duration in seconds using ffmpeg directly"""
+        import subprocess
         try:
-            # Try using ffmpeg-python
-            import ffmpeg
-            probe = ffmpeg.probe(audio_path)
-            duration = float(probe['format']['duration'])
-            return duration
+            result = subprocess.run(
+                ["ffmpeg", "-i", audio_path],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            for line in result.stderr.split("\n"):
+                if "Duration:" in line:
+                    duration_str = line.split("Duration:")[1].split(",")[0].strip()
+                    parts = duration_str.split(":")
+                    if len(parts) == 3:
+                        hours = float(parts[0])
+                        minutes = float(parts[1])
+                        seconds = float(parts[2])
+                        return hours * 3600 + minutes * 60 + seconds
         except Exception as e:
-            logger.warning(f"Failed to get audio duration: {e}, using estimate")
-            # Fallback: estimate based on file size (very rough)
-            import os
-            file_size = os.path.getsize(audio_path)
-            # Assume ~16kbps for MP3, so 2KB per second
-            estimated_duration = file_size / 2000
-            return max(1.0, estimated_duration)  # At least 1 second
+            logger.warning(f"Failed to get audio duration: {e}")
+        # Fallback: estimate based on file size
+        import os
+        file_size = os.path.getsize(audio_path)
+        return max(1.0, file_size / 2000)
     
     async def _download_media(
         self,
@@ -491,15 +500,26 @@ class FrameProcessor:
                 f.write(response.content)
         
         return output_path
-    
+
     async def _get_video_duration(self, video_path: str) -> float:
-        """Get video duration in seconds"""
+        """Get video duration in seconds using ffmpeg directly"""
+        import subprocess
         try:
-            import ffmpeg
-            probe = ffmpeg.probe(video_path)
-            duration = float(probe['format']['duration'])
-            return duration
+            result = subprocess.run(
+                ["ffmpeg", "-i", video_path],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            for line in result.stderr.split("\n"):
+                if "Duration:" in line:
+                    duration_str = line.split("Duration:")[1].split(",")[0].strip()
+                    parts = duration_str.split(":")
+                    if len(parts) == 3:
+                        hours = float(parts[0])
+                        minutes = float(parts[1])
+                        seconds = float(parts[2])
+                        return hours * 3600 + minutes * 60 + seconds
         except Exception as e:
-            logger.warning(f"Failed to get video duration: {e}, using audio duration")
-            # Fallback: use audio duration if available
-            return 1.0  # Default to 1 second if unable to determine
+            logger.warning(f"Failed to get video duration: {e}")
+        return 1.0  # Default to 1 second

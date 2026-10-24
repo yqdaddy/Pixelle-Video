@@ -135,7 +135,19 @@ class ConfigManager:
             "runninghub_concurrent_limit": self.config.comfyui.runninghub_concurrent_limit,
             "runninghub_instance_type": self.config.comfyui.runninghub_instance_type,
             "tts": {
+                "inference_mode": self.config.comfyui.tts.inference_mode,
                 "default_workflow": self.config.comfyui.tts.default_workflow,
+                "local": {
+                    "voice": self.config.comfyui.tts.local.voice,
+                    "speed": self.config.comfyui.tts.local.speed,
+                },
+                "macos": {
+                    "voice": self.config.comfyui.tts.macos.voice,
+                    "speed": self.config.comfyui.tts.macos.speed,
+                },
+                "comfyui": {
+                    "default_workflow": self.config.comfyui.tts.comfyui.default_workflow,
+                },
             },
             "image": {
                 "default_workflow": self.config.comfyui.image.default_workflow,

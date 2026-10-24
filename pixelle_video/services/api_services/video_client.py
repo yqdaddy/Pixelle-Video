@@ -14,10 +14,12 @@ try:
     from .video_dashscope import DashscopeVideoClient
     from .video_kling import KlingVideoClient
     from .video_seedance import SeedanceVideoClient
+    from .video_agnes import AgnesVideoClient
 except ImportError:
     from video_dashscope import DashscopeVideoClient
     from video_kling import KlingVideoClient
     from video_seedance import SeedanceVideoClient
+    from video_agnes import AgnesVideoClient
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,9 @@ class VideoClient:
         ark_api_key: Optional[str] = None,
         ark_base_url: Optional[str] = None,
         ark_local_proxy: Optional[str] = None,
+        agnes_api_key: Optional[str] = None,
+        agnes_base_url: Optional[str] = None,
+        agnes_local_proxy: Optional[str] = None,
     ):
         self._dashscope_api_key = dashscope_api_key or Config.DASHSCOPE_API_KEY
         self._dashscope_base_url = dashscope_base_url or Config.DASHSCOPE_BASE_URL
@@ -54,9 +59,14 @@ class VideoClient:
         self._ark_base_url = ark_base_url or Config.ARK_BASE_URL or os.getenv("ARK_BASE_URL")
         self._ark_local_proxy = ark_local_proxy
 
+        self._agnes_api_key = agnes_api_key or Config.AGNES_API_KEY or os.getenv("AGNES_API_KEY")
+        self._agnes_base_url = agnes_base_url or Config.AGNES_BASE_URL or os.getenv("AGNES_BASE_URL")
+        self._agnes_local_proxy = agnes_local_proxy
+
         self._dashscope_client = None
         self._kling_client = None
         self._seedance_client = None
+        self._agnes_client = None
 
     @property
     def Dashscope_client(self):
@@ -91,6 +101,17 @@ class VideoClient:
                 local_proxy=self._ark_local_proxy,
             )
         return self._seedance_client
+
+    @property
+    def agnes_client(self):
+        """Create Agnes client only when an Agnes model is selected."""
+        if self._agnes_client is None:
+            self._agnes_client = AgnesVideoClient(
+                api_key=self._agnes_api_key,
+                base_url=self._agnes_base_url,
+                local_proxy=self._agnes_local_proxy,
+            )
+        return self._agnes_client
 
     def generate_video(
         self,
@@ -225,6 +246,16 @@ class VideoClient:
                 seed,
                 audio,
             )
+        elif "agnes" in model_lower:
+            return self._generate_agnes(
+                prompt,
+                image_path,
+                save_path,
+                model,
+                duration,
+                video_ratio,
+                mode,
+            )
         else:
             raise ValueError(f"未知的视频生成模型: {model}")
 
@@ -330,4 +361,30 @@ class VideoClient:
             seed=seed,
             watermark=watermark,
             generate_audio=generate_audio,
+        )
+
+    def _generate_agnes(
+        self,
+        prompt: str,
+        image_path: Optional[str],
+        save_path: str,
+        model: str,
+        duration: int = 5,
+        video_ratio: str = "16:9",
+        mode: str = "text",
+    ) -> str:
+        """通过 Agnes 模型生成视频"""
+        logger.info(f"VideoClient: 路由至 Agnes model={model}")
+        # 将 image_path 参数映射到 Agnes 的 mode
+        agnes_mode = mode if mode in ("text", "keyframe", "reference") else "text"
+        if image_path and agnes_mode == "text":
+            agnes_mode = "keyframe"  # 有图片时默认使用首帧模式
+        return self.agnes_client.generate_video(
+            prompt=prompt,
+            save_path=save_path,
+            model=model,
+            image_path=image_path,
+            duration=duration,
+            aspect_ratio=video_ratio,
+            mode=agnes_mode,
         )

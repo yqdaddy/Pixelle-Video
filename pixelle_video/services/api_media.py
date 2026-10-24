@@ -34,6 +34,10 @@ class APIProviderMediaService:
             "doubao-seedream-4-5-251128",
             "doubao-seedream-4-0-250828",
         ],
+        "agnes": [
+            "agnes-image-2.5-flash",
+            "agnes-image-2.5-pro",
+        ],
     }
 
     VIDEO_MODELS = {
@@ -58,6 +62,10 @@ class APIProviderMediaService:
             "doubao-seedance-2-0-fast-260128",
             "seedance-1-0-pro",
             "seedance-1-0-lite",
+        ],
+        "agnes": [
+            "agnes-video-2.5-flash",
+            "agnes-video-2.5-pro",
         ],
     }
 
@@ -373,6 +381,32 @@ class APIProviderMediaService:
                 "Exact official model ID was not found. Volcengine docs refer to doubao-seedance model IDs, so this alias must be confirmed before relying on it.",
             ],
         },
+        ("agnes", "agnes-video-2.5-flash"): {
+            "ability_type": "text_to_video",
+            "ability_types": ["text_to_video", "image_to_video"],
+            "adapter_ability_types": ["text_to_video", "first_frame_i2v"],
+            "input_modalities": ["text", "image"],
+            "adapter_input_modalities": ["text", "image"],
+            "duration": {"min": 2, "max": 10, "integer": True, "verified": True},
+            "ratios": ["16:9", "9:16", "1:1"],
+            "format": "mp4",
+            "api_contract_verified": True,
+            "source_urls": [],
+            "contract_issues": [],
+        },
+        ("agnes", "agnes-video-2.5-pro"): {
+            "ability_type": "text_to_video",
+            "ability_types": ["text_to_video", "image_to_video"],
+            "adapter_ability_types": ["text_to_video", "first_frame_i2v"],
+            "input_modalities": ["text", "image"],
+            "adapter_input_modalities": ["text", "image"],
+            "duration": {"min": 2, "max": 10, "integer": True, "verified": True},
+            "ratios": ["16:9", "9:16", "1:1"],
+            "format": "mp4",
+            "api_contract_verified": True,
+            "source_urls": [],
+            "contract_issues": [],
+        },
     }
 
     def __init__(self, config: dict, core=None):
@@ -680,6 +714,9 @@ class APIProviderMediaService:
             ark_api_key=cfg["ark"].get("api_key") or None,
             ark_base_url=cfg["ark"].get("base_url") or None,
             ark_local_proxy=local_proxy if cfg["ark"].get("use_proxy") else None,
+            agnes_api_key=cfg["agnes"].get("api_key") or None,
+            agnes_base_url=cfg["agnes"].get("base_url") or None,
+            agnes_local_proxy=local_proxy if cfg["agnes"].get("use_proxy") else None,
         )
 
     def _create_video_client(self):
@@ -698,6 +735,9 @@ class APIProviderMediaService:
             ark_api_key=cfg["ark"].get("api_key") or None,
             ark_base_url=cfg["ark"].get("base_url") or None,
             ark_local_proxy=local_proxy if cfg["ark"].get("use_proxy") else None,
+            agnes_api_key=cfg["agnes"].get("api_key") or None,
+            agnes_base_url=cfg["agnes"].get("base_url") or None,
+            agnes_local_proxy=local_proxy if cfg["agnes"].get("use_proxy") else None,
         )
 
     def _save_dir(self, output_path: Optional[str], fallback_name: str) -> str:

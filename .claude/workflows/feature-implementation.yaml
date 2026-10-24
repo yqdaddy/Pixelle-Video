@@ -1,0 +1,90 @@
+name: 功能实现工作流
+description: 从需求分析到验收的完整功能开发流程
+version: 1.0
+agents_dir: .claude/agents
+
+inputs:
+  - name: feature_name
+    required: true
+    description: 功能名称
+  - name: feature_description
+    required: true
+    description: 功能详细描述
+  - name: priority
+    required: false
+    default: "P1"
+    description: 优先级
+
+steps:
+  - id: requirements
+    role: "dev-pv-backend-architect"
+    task: |
+      分析功能需求：{{feature_name}}
+      描述：{{feature_description}}
+      优先级：{{priority}}
+
+      输出：
+      1. 需求文档（功能点、边界条件）
+      2. 验收标准（可测试的验收条件）
+      3. 技术要点
+    output: requirements_doc
+
+  - id: design
+    role: "dev-pv-backend-architect"
+    task: |
+      基于以下需求设计技术方案：
+      {{requirements_doc}}
+
+      输出：
+      1. API 设计（端点、请求/响应格式）
+      2. 数据库设计（表结构、索引）
+      3. 接口契约（前后端约定）
+    output: design_doc
+    depends_on: [requirements]
+
+  - id: frontend
+    role: "dev-pv-frontend-developer"
+    task: |
+      前端实现，设计文档如下：
+      {{design_doc}}
+
+      按照接口契约实现前端功能，包含 UI 组件、状态管理、API 调用。
+      完成后输出实现摘要与涉及文件列表。
+    output: frontend_code
+    depends_on: [design]
+
+  - id: backend
+    role: "dev-pv-backend-architect"
+    task: |
+      后端实现，设计文档如下：
+      {{design_doc}}
+
+      按照设计文档实现后端功能，包含 API 端点、数据库操作、业务逻辑。
+      完成后输出实现摘要与涉及文件列表。
+    output: backend_code
+    depends_on: [design]
+
+  - id: verification
+    role: "dev-pv-reality-checker"
+    task: |
+      独立验证（执行者 ≠ 验证者，你不参与开发）：
+
+      前端实现：{{frontend_code}}
+      后端实现：{{backend_code}}
+
+      验证项：
+      1. 功能完整性（对照验收标准逐条核对）
+      2. 接口契约一致性（前后端是否匹配）
+      3. 代码质量（无 P0 bug）
+      4. 测试证据（运行测试并附日志）
+
+      输出：验证报告 + 证据 + 通过/不通过判定
+    output: verification_report
+    depends_on: [frontend, backend]
+
+outputs:
+  - requirements_doc
+  - design_doc
+  - frontend_code
+  - backend_code
+  - verification_report

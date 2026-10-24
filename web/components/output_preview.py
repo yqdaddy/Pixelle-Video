@@ -50,8 +50,11 @@ def render_single_output(pixelle_video, video_params):
     split_mode = video_params.get("split_mode", "paragraph")
     bgm_path = video_params.get("bgm_path")
     bgm_volume = video_params.get("bgm_volume", 0.2)
-    
-    tts_mode = video_params.get("tts_inference_mode", "local")
+
+    # TTS mode - use config default if not specified
+    comfyui_config = config_manager.get_comfyui_config()
+    default_tts_mode = comfyui_config.get("tts", {}).get("inference_mode", "local")
+    tts_mode = video_params.get("tts_inference_mode") or default_tts_mode
     selected_voice = video_params.get("tts_voice")
     tts_speed = video_params.get("tts_speed")
     tts_workflow_key = video_params.get("tts_workflow")
@@ -265,7 +268,7 @@ def render_batch_output(pixelle_video, video_params):
                 "prompt_prefix": video_params.get("prompt_prefix") or "",
                 "bgm_path": video_params.get("bgm_path"),
                 "bgm_volume": video_params.get("bgm_volume") or 0.2,
-                "tts_inference_mode": video_params.get("tts_inference_mode") or "local",
+                "tts_inference_mode": video_params.get("tts_inference_mode") or default_tts_mode,
                 "media_width": video_params.get("media_width"),
                 "media_height": video_params.get("media_height"),
             }

@@ -1,0 +1,64 @@
+name: Bug 修复工作流
+description: 从根因分析到修复验证的完整流程
+version: 1.0
+agents_dir: .claude/agents
+
+inputs:
+  - name: bug_description
+    required: true
+    description: Bug 描述
+  - name: bug_severity
+    required: false
+    default: "P1"
+    description: 严重程度（P0/P1/P2）
+  - name: reproduction_steps
+    required: false
+    description: 复现步骤
+
+steps:
+  - id: analysis
+    role: "dev-pv-backend-architect"
+    task: |
+      分析 Bug（先定位根因，禁止未查明根因就修复）：
+      描述：{{bug_description}}
+      严重程度：{{bug_severity}}
+      复现步骤：{{reproduction_steps}}
+
+      输出：
+      1. 根因分析（含代码位置 file:line）
+      2. 影响范围
+      3. 修复方案
+    output: analysis_doc
+
+  - id: fix
+    role: "dev-pv-backend-architect"
+    task: |
+      实现修复，分析文档如下：
+      {{analysis_doc}}
+
+      输出：
+      - 修复代码
+      - 回归测试用例（证明 bug 已修复且未引入新问题）
+    output: fix_code
+    depends_on: [analysis]
+
+  - id: verification
+    role: "dev-pv-reality-checker"
+    task: |
+      独立验证修复（你不参与修复）：
+
+      修复内容：{{fix_code}}
+
+      验证项：
+      1. 原问题不再复现（按复现步骤实测）
+      2. 回归测试通过（附测试日志）
+      3. 修复未引入新问题
+
+      输出：验证报告 + 证据 + 通过/不通过判定
+    output: verification_report
+    depends_on: [fix]
+
+outputs:
+  - analysis_doc
+  - fix_code
+  - verification_report

@@ -300,11 +300,13 @@ def render_advanced_settings():
         dashscope_cfg = api_cfg.get("dashscope", {})
         ark_cfg = api_cfg.get("ark", {})
         kling_cfg = api_cfg.get("kling", {})
+        agnes_cfg = api_cfg.get("agnes", {})
         default_api_base_urls = {
             "openai": "https://api.openai.com/v1",
             "dashscope": "https://dashscope.aliyuncs.com/api/v1",
             "ark": "https://ark.cn-beijing.volces.com/api/v3",
             "kling": "https://api-beijing.klingai.com",
+            "agnes": "https://api.agnes-ai.cn/v1",
         }
 
         with st.container(border=True):
@@ -426,6 +428,29 @@ def render_advanced_settings():
                     type="password",
                     key="api_media_kling_secret_key",
                 )
+
+            st.markdown("---")
+
+            agnes_col1, agnes_col2 = st.columns(2)
+            with agnes_col1:
+                st.markdown("**Agnes AI**")
+                api_agnes_use_proxy = st.checkbox(
+                    "Agnes 启用代理" if zh else "Use proxy for Agnes",
+                    value=bool(agnes_cfg.get("use_proxy", False)),
+                    key="api_media_agnes_use_proxy",
+                )
+                api_agnes_key = st.text_input(
+                    "Agnes API Key",
+                    value=agnes_cfg.get("api_key", ""),
+                    type="password",
+                    key="api_media_agnes_key",
+                )
+                api_agnes_base_url = st.text_input(
+                    "Agnes Base URL",
+                    value=agnes_cfg.get("base_url") or default_api_base_urls["agnes"],
+                    placeholder="https://api.agnes-ai.cn/v1",
+                    key="api_media_agnes_base_url",
+                )
         
         # ====================================================================
         # Action Buttons (full width at bottom)
@@ -478,6 +503,11 @@ def render_advanced_settings():
                         "access_key": api_kling_access_key or "",
                         "secret_key": api_kling_secret_key or "",
                         "use_proxy": bool(api_kling_use_proxy),
+                    })
+                    config_manager.set_api_provider_config("agnes", {
+                        "api_key": api_agnes_key or "",
+                        "base_url": api_agnes_base_url or "",
+                        "use_proxy": bool(api_agnes_use_proxy),
                     })
                     
                     # Only save to file if LLM config is valid

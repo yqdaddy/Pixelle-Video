@@ -235,11 +235,27 @@ def get_audio_duration(audio_path: str) -> float:
         Duration in seconds
     """
     try:
-        # Try using ffmpeg-python
-        import ffmpeg
-        probe = ffmpeg.probe(audio_path)
-        duration = float(probe['format']['duration'])
-        return duration
+        # Use ffmpeg directly (works without ffprobe)
+        import subprocess
+        result = subprocess.run(
+            ["ffmpeg", "-i", audio_path],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        for line in result.stderr.split("\n"):
+            if "Duration:" in line:
+                duration_str = line.split("Duration:")[1].split(",")[0].strip()
+                parts = duration_str.split(":")
+                if len(parts) == 3:
+                    hours = float(parts[0])
+                    minutes = float(parts[1])
+                    seconds = float(parts[2])
+                    return hours * 3600 + minutes * 60 + seconds
+        # Fallback: estimate based on file size
+        import os
+        file_size = os.path.getsize(audio_path)
+        return max(1.0, file_size / 2000)
     except Exception as e:
         logger.warning(f"Failed to get audio duration: {e}, using estimate")
         # Fallback: estimate based on file size (very rough)
