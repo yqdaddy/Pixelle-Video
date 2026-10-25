@@ -154,8 +154,9 @@ class StandardPipeline(LinearVideoPipeline):
     async def plan_visuals(self, ctx: PipelineContext):
         """Step 4: Generate image prompts or visual descriptions."""
         # Detect template type to determine if media generation is needed
-        frame_template = ctx.params.get("frame_template") or "1080x1920/default.html"
-        
+        # Default to image_default.html (new naming convention)
+        frame_template = ctx.params.get("frame_template") or "1080x1920/image_default.html"
+
         template_name = Path(frame_template).name
         template_type = get_template_type(template_name)
         template_requires_media = (template_type in ["image", "video"])
@@ -269,7 +270,7 @@ class StandardPipeline(LinearVideoPipeline):
             media_height=ctx.params.get("media_height"),
             media_workflow=ctx.params.get("media_workflow"),
             api_video_params=ctx.params.get("api_video_params"),
-            frame_template=ctx.params.get("frame_template") or "1080x1920/default.html",
+            frame_template=ctx.params.get("frame_template") or "1080x1920/image_default.html",
             template_params=ctx.params.get("template_params")
         )
         

@@ -51,7 +51,7 @@ class StoryboardConfig:
     api_video_params: Optional[Dict[str, Any]] = None  # Extra direct API video generation parameters
     
     # Frame template (includes size information in path)
-    frame_template: str = "1080x1920/default.html"  # Template path with size (e.g., "1080x1920/default.html")
+    frame_template: str = "1080x1920/image_default.html"  # Template path with size (e.g., "1080x1920/image_default.html")
     template_params: Optional[Dict[str, Any]] = None  # Custom template parameters (e.g., {"accent_color": "#ff0000"})
 
 
