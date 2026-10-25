@@ -611,19 +611,16 @@ class HTMLFrameGenerator:
             frame_interval = total_duration / frame_count
 
             for i in range(frame_count):
-                # Calculate time point for this frame
-                time_point = i * frame_interval
-
-                # Wait until the animation reaches this time point
-                if time_point > 0:
-                    await page.wait_for_timeout(int(time_point * 1000))
+                # Wait between frames (not before first frame)
+                if i > 0:
+                    await page.wait_for_timeout(int(frame_interval * 1000))
 
                 # Capture frame
                 frame_path = os.path.join(output_dir, f"frame_{i:04d}.png")
                 await page.screenshot(path=frame_path, type='png', omit_background=True)
                 frame_paths.append(frame_path)
 
-                logger.debug(f"  Frame {i+1}/{frame_count} captured at {time_point:.2f}s: {frame_path}")
+                logger.debug(f"  Frame {i+1}/{frame_count} captured: {frame_path}")
 
             logger.success(f"Animated frames generated: {len(frame_paths)} frames in {output_dir}")
             return frame_paths
