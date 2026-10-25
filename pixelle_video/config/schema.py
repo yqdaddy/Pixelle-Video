@@ -150,7 +150,7 @@ class ComfyUIConfig(BaseModel):
 class TemplateConfig(BaseModel):
     """Template configuration"""
     default_template: str = Field(
-        default="1080x1920/image_default.html",
+        default="1080x1920/static_excerpt_animated.html",
         description="Default frame template path"
     )
 
