@@ -61,19 +61,20 @@ class StoryboardFrame:
     index: int                                 # Frame index (0-based)
     narration: str                             # Narration text
     image_prompt: str                          # Image generation prompt (can be None for text-only or video)
-    
+
     # Generated resource paths
     audio_path: Optional[str] = None           # Audio file path (narration)
     media_type: Optional[str] = None           # Media type: "image" or "video" (None if no media)
     image_path: Optional[str] = None           # Original image path (for image type)
     video_path: Optional[str] = None           # Original video path (for video type, before composition)
     composed_image_path: Optional[str] = None  # Composed image path (with subtitles, for image type)
+    animated_frames: Optional[List[str]] = None  # Animated frame paths (for animated templates)
     video_segment_path: Optional[str] = None   # Final video segment path
-    
+
     # Metadata
     duration: float = 0.0                      # Frame duration (seconds, from audio or video)
     created_at: Optional[datetime] = None
-    
+
     def __post_init__(self):
         if self.created_at is None:
             self.created_at = datetime.now()

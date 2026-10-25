@@ -159,19 +159,51 @@ class HTMLFrameGenerator:
     def get_media_size(self) -> tuple[int, int]:
         """
         Get media size for image/video generation
-        
+
         Returns media size specified in template meta tags.
-        
+
         Returns:
             Tuple of (width, height)
         """
         media_width, media_height = self._parse_media_size_from_meta()
-        
+
         if media_width and media_height:
             return media_width, media_height
-        
+
         logger.warning(f"No media size meta tags found in template {self.template_path}, using fallback 1024x1024")
         return 1024, 1024
+
+    def has_animations(self) -> bool:
+        """
+        Check if template contains CSS animations
+
+        Detects animation-related CSS:
+        - @keyframes rules
+        - animation properties
+
+        Returns:
+            True if template contains animations, False otherwise
+
+        Example:
+            >>> generator = HTMLFrameGenerator("animated_template.html")
+            >>> if generator.has_animations():
+            ...     frames = await generator.generate_animated_frames(...)
+        """
+        html_content = self.template.lower()
+
+        # Check for @keyframes rules
+        if '@keyframes' in html_content:
+            logger.debug(f"Template {self.template_path} contains @keyframes animations")
+            return True
+
+        # Check for animation property (excludes 'animation-' in meta tags)
+        # Look for 'animation:' property (not 'animation-')
+        if re.search(r'\banimation\s*:', html_content):
+            logger.debug(f"Template {self.template_path} contains animation properties")
+            return True
+
+        logger.debug(f"Template {self.template_path} has no animations")
+        return False
     
     def parse_template_parameters(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -390,16 +422,16 @@ class HTMLFrameGenerator:
     ) -> str:
         """
         Generate frame from HTML template
-        
+
         Video size is automatically determined from template path during initialization.
-        
+
         Args:
             title: Video title
             text: Narration text for this frame
             image: Path to AI-generated image (supports relative path, absolute path, or HTTP URL)
             ext: Additional data (content_title, content_author, etc.)
             output_path: Custom output path (auto-generated if None)
-        
+
         Returns:
             Path to generated frame image
         """
@@ -407,22 +439,22 @@ class HTMLFrameGenerator:
             image_path = Path(image)
             if not image_path.is_absolute():
                 image_path = Path.cwd() / image
-            
+
             if not image_path.exists():
                 logger.warning(f"Image file not found: {image_path}")
             else:
                 image = image_path.as_uri()
                 logger.debug(f"Converted image path to: {image}")
-        
+
         context = {
             "title": title,
             "text": text,
             "image": image,
         }
-        
+
         if ext:
             context.update(ext)
-        
+
         html = self._replace_parameters(self.template, context)
 
         if output_path is None:
@@ -431,7 +463,7 @@ class HTMLFrameGenerator:
             output_path = get_output_path(output_filename)
         else:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
+
         logger.debug(f"Rendering HTML template to {output_path} (size: {self.width}x{self.height})")
         tmp_html_path = None
         page = None
@@ -457,7 +489,7 @@ class HTMLFrameGenerator:
                 fd, tmp_html_path = tempfile.mkstemp(suffix='.html', prefix='pv_frame_')
                 with os.fdopen(fd, 'w', encoding='utf-8') as f:
                     f.write(html)
-                
+
                 await page.goto(Path(tmp_html_path).as_uri(), wait_until='networkidle')
                 await page.screenshot(path=output_path, type='png', omit_background=True)
             finally:
@@ -465,12 +497,144 @@ class HTMLFrameGenerator:
                     await page.close()
                 if tmp_html_path and os.path.exists(tmp_html_path):
                     os.unlink(tmp_html_path)
-            
+
             logger.info(f"Frame generated: {output_path}")
             return output_path
-            
+
         except Exception as e:
             logger.exception("Failed to render HTML template")
             raise RuntimeError(
                 f"HTML rendering failed: {type(e).__name__}: {e}"
             ) from e
+
+    async def generate_animated_frames(
+        self,
+        title: str,
+        text: str,
+        image: str,
+        ext: Optional[Dict[str, Any]] = None,
+        output_dir: Optional[str] = None,
+        frame_count: int = 10,
+        total_duration: float = 5.0
+    ) -> list[str]:
+        """
+        Generate multiple frames from animated HTML template
+
+        Renders frames at evenly spaced time intervals to capture animation effects.
+
+        Args:
+            title: Video title
+            text: Narration text for this frame
+            image: Path to AI-generated image
+            ext: Additional data (content_title, content_author, etc.)
+            output_dir: Directory to save frames (auto-generated if None)
+            frame_count: Number of frames to generate (default: 10)
+            total_duration: Total animation duration in seconds (default: 5.0)
+
+        Returns:
+            List of paths to generated frame images
+
+        Example:
+            >>> frames = await generator.generate_animated_frames(
+            ...     title="My Title",
+            ...     text="Some text",
+            ...     image="image.png",
+            ...     frame_count=10,
+            ...     total_duration=5.0
+            ... )
+            >>> # Returns: ['frame_0.png', 'frame_1.png', ..., 'frame_9.png']
+        """
+        if image and not image.startswith(('http://', 'https://', 'data:', 'file://')):
+            image_path = Path(image)
+            if not image_path.is_absolute():
+                image_path = Path.cwd() / image
+
+            if not image_path.exists():
+                logger.warning(f"Image file not found: {image_path}")
+            else:
+                image = image_path.as_uri()
+                logger.debug(f"Converted image path to: {image}")
+
+        context = {
+            "title": title,
+            "text": text,
+            "image": image,
+        }
+
+        if ext:
+            context.update(ext)
+
+        html = self._replace_parameters(self.template, context)
+
+        # Create output directory
+        if output_dir is None:
+            from pixelle_video.utils.os_util import get_output_path
+            output_dir = get_output_path(f"animated_frames_{uuid.uuid4().hex[:16]}")
+
+        os.makedirs(output_dir, exist_ok=True)
+
+        logger.info(
+            f"Rendering animated template to {frame_count} frames "
+            f"(duration: {total_duration}s, size: {self.width}x{self.height})"
+        )
+
+        tmp_html_path = None
+        page = None
+        frame_paths = []
+
+        try:
+            # Initialize browser
+            try:
+                browser = await self._ensure_browser()
+                page = await browser.new_page(
+                    viewport={'width': self.width, 'height': self.height},
+                    device_scale_factor=1,
+                )
+            except Exception as e:
+                logger.warning(f"Playwright browser connection failed, restarting once: {e}")
+                await self._reset_browser()
+                browser = await self._ensure_browser()
+                page = await browser.new_page(
+                    viewport={'width': self.width, 'height': self.height},
+                    device_scale_factor=1,
+                )
+
+            # Write HTML to temp file
+            fd, tmp_html_path = tempfile.mkstemp(suffix='.html', prefix='pv_animated_')
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                f.write(html)
+
+            # Navigate to HTML
+            await page.goto(Path(tmp_html_path).as_uri(), wait_until='networkidle')
+
+            # Capture frames at evenly spaced intervals
+            frame_interval = total_duration / frame_count
+
+            for i in range(frame_count):
+                # Calculate time point for this frame
+                time_point = i * frame_interval
+
+                # Wait until the animation reaches this time point
+                if time_point > 0:
+                    await page.wait_for_timeout(int(time_point * 1000))
+
+                # Capture frame
+                frame_path = os.path.join(output_dir, f"frame_{i:04d}.png")
+                await page.screenshot(path=frame_path, type='png', omit_background=True)
+                frame_paths.append(frame_path)
+
+                logger.debug(f"  Frame {i+1}/{frame_count} captured at {time_point:.2f}s: {frame_path}")
+
+            logger.success(f"Animated frames generated: {len(frame_paths)} frames in {output_dir}")
+            return frame_paths
+
+        except Exception as e:
+            logger.exception("Failed to render animated HTML template")
+            raise RuntimeError(
+                f"Animated HTML rendering failed: {type(e).__name__}: {e}"
+            ) from e
+        finally:
+            if page:
+                await page.close()
+            if tmp_html_path and os.path.exists(tmp_html_path):
+                os.unlink(tmp_html_path)

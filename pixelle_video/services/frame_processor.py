@@ -322,20 +322,20 @@ class FrameProcessor:
     ):
         """Step 3: Compose frame with subtitle using HTML template"""
         logger.debug(f"  3/4: Composing frame {frame.index}...")
-        
+
         # Generate output path using task_id
         from pixelle_video.utils.os_util import get_task_frame_path
         output_path = get_task_frame_path(config.task_id, frame.index, "composed")
-        
+
         # For video type: render HTML as transparent overlay image
         # For image type: render HTML with image background
         # In both cases, we need the composed image
         composed_path = await self._compose_frame_html(frame, storyboard, config, output_path)
-        
+
         frame.composed_image_path = composed_path
-        
+
         logger.debug(f"  ✓ Frame composed: {composed_path}")
-    
+
     async def _compose_frame_html(
         self,
         frame: StoryboardFrame,
@@ -343,41 +343,91 @@ class FrameProcessor:
         config: StoryboardConfig,
         output_path: str
     ) -> str:
-        """Compose frame using HTML template"""
+        """
+        Compose frame using HTML template
+
+        Supports both static and animated templates:
+        - Static templates: Generate single frame image
+        - Animated templates: Generate multiple frames for animation
+
+        Returns:
+            For static templates: Path to single composed image
+            For animated templates: Path to first frame (frames stored in adjacent directory)
+        """
         from pixelle_video.services.frame_html import HTMLFrameGenerator
         from pixelle_video.utils.template_util import resolve_template_path
-        
+
         # Resolve template path (handles various input formats)
         template_path = resolve_template_path(config.frame_template)
-        
+
         # Get content metadata from storyboard
         content_metadata = storyboard.content_metadata if storyboard else None
-        
+
         # Build ext data
         ext = {
             "index": frame.index + 1,
         }
-        
+
         # Add custom template parameters
         if config.template_params:
             ext.update(config.template_params)
-        
+
         # Generate frame using HTML (size is auto-parsed from template path)
         generator = HTMLFrameGenerator(template_path)
-        
+
         # Use video_path for video media, image_path for images
         media_path = frame.video_path if frame.media_type == "video" else frame.image_path
         logger.debug(f"Generating frame with media: '{media_path}' (type: {frame.media_type})")
-        
-        composed_path = await generator.generate_frame(
-            title=storyboard.title,
-            text=frame.narration,
-            image=media_path,  # HTMLFrameGenerator handles both image and video paths
-            ext=ext,
-            output_path=output_path
-        )
-        
-        return composed_path
+
+        # Check if template has animations
+        has_animations = generator.has_animations()
+
+        if has_animations:
+            logger.info(f"  → Detected animated template, generating multiple frames")
+
+            # Generate animated frames
+            # Determine frame count and duration based on audio duration
+            frame_count = 10  # Default frame count
+            total_duration = 5.0  # Default duration
+
+            # Use audio duration if available
+            if frame.duration:
+                total_duration = frame.duration
+                # Adjust frame count based on duration (2 fps for smooth animation)
+                frame_count = max(10, int(total_duration * 2))
+
+            logger.debug(f"  → Generating {frame_count} frames over {total_duration:.2f}s")
+
+            # Generate frames
+            import os
+            output_dir = os.path.join(os.path.dirname(output_path), f"animated_frames_{frame.index}")
+            frame_paths = await generator.generate_animated_frames(
+                title=storyboard.title,
+                text=frame.narration,
+                image=media_path,
+                ext=ext,
+                output_dir=output_dir,
+                frame_count=frame_count,
+                total_duration=total_duration
+            )
+
+            # Store frame paths in frame object for video generation
+            frame.animated_frames = frame_paths
+            logger.debug(f"  ✓ Generated {len(frame_paths)} animated frames in {output_dir}")
+
+            # Return first frame path for compatibility
+            return frame_paths[0]
+        else:
+            # Static template: generate single frame
+            composed_path = await generator.generate_frame(
+                title=storyboard.title,
+                text=frame.narration,
+                image=media_path,  # HTMLFrameGenerator handles both image and video paths
+                ext=ext,
+                output_path=output_path
+            )
+
+            return composed_path
     
     async def _step_create_video_segment(
         self,
@@ -386,30 +436,33 @@ class FrameProcessor:
     ):
         """Step 4: Create video segment from media + audio"""
         logger.debug(f"  4/4: Creating video segment for frame {frame.index}...")
-        
+
         # Generate output path using task_id
         from pixelle_video.utils.os_util import get_task_frame_path
         output_path = get_task_frame_path(config.task_id, frame.index, "segment")
-        
+
         from pixelle_video.services.video import VideoService
         video_service = VideoService()
-        
-        # Branch based on media type
+
+        # Check if we have animated frames
+        has_animated_frames = hasattr(frame, 'animated_frames') and frame.animated_frames
+
+        # Branch based on media type and animation
         if frame.media_type == "video":
             # Video workflow: overlay HTML template on video, then add audio
             logger.debug(f"  → Using video-based composition with HTML overlay")
-            
+
             # Step 1: Overlay transparent HTML image on video
             # The composed_image_path contains the rendered HTML with transparent background
             temp_video_with_overlay = get_task_frame_path(config.task_id, frame.index, "video") + "_overlay.mp4"
-            
+
             video_service.overlay_image_on_video(
                 video=frame.video_path,
                 overlay_image=frame.composed_image_path,
                 output=temp_video_with_overlay,
                 scale_mode="contain"  # Scale video to fit template size (contain mode)
             )
-            
+
             # Step 2: Add narration audio to the overlaid video
             # Note: The video might have audio (replaced) or be silent (audio added)
             segment_path = video_service.merge_audio_video(
@@ -419,29 +472,40 @@ class FrameProcessor:
                 replace_audio=True,  # Replace video audio with narration
                 audio_volume=1.0
             )
-            
+
             # Clean up temp file
             import os
             if os.path.exists(temp_video_with_overlay):
                 os.unlink(temp_video_with_overlay)
-        
+
+        elif has_animated_frames:
+            # Animated template: Create video from multiple frames
+            logger.debug(f"  → Using animated frames composition ({len(frame.animated_frames)} frames)")
+
+            segment_path = video_service.create_video_from_frames(
+                frames=frame.animated_frames,
+                audio=frame.audio_path,
+                output=output_path,
+                fps=2  # 2 fps for smooth animation
+            )
+
         elif frame.media_type == "image" or frame.media_type is None:
             # Image workflow: Use composed image directly
             # The asset_default.html template includes the image in the composition
             logger.debug(f"  → Using image-based composition")
-            
+
             segment_path = video_service.create_video_from_image(
                 image=frame.composed_image_path,
                 audio=frame.audio_path,
                 output=output_path,
                 fps=config.video_fps
             )
-        
+
         else:
             raise ValueError(f"Unknown media type: {frame.media_type}")
-        
+
         frame.video_segment_path = segment_path
-        
+
         logger.debug(f"  ✓ Video segment created: {segment_path}")
 
     async def _get_audio_duration(self, audio_path: str) -> float:

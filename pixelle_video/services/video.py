@@ -727,24 +727,24 @@ class VideoService:
     ) -> str:
         """
         Create video from static image and audio
-        
+
         Args:
             image: Image file path
             audio: Audio file path
             output: Output video path
             fps: Frames per second
-        
+
         Returns:
             Path to the output video
-        
+
         Raises:
             RuntimeError: If FFmpeg execution fails
-        
+
         Note:
             - Image is displayed as static frame for the duration of audio
             - Video duration matches audio duration
             - Useful for creating video segments from storyboard frames
-        
+
         Example:
             >>> compositor.create_video_from_image(
             ...     "frame.png",
@@ -759,12 +759,12 @@ class VideoService:
             # Get audio duration to ensure exact video duration match
             audio_duration = _probe_media_duration(audio)
             logger.debug(f"Audio duration: {audio_duration:.3f}s")
-            
+
             # Input image with loop (loop=1 means loop indefinitely)
             # Use framerate to set input framerate
             input_image = ffmpeg.input(image, loop=1, framerate=fps)
             input_audio = ffmpeg.input(audio)
-            
+
             # Combine image and audio
             # Use -t to explicitly set video duration = audio duration
             (
@@ -785,13 +785,110 @@ class VideoService:
                 .overwrite_output()
                 .run(capture_stdout=True, capture_stderr=True)
             )
-            
+
             logger.success(f"Video created from image: {output} (duration: {audio_duration:.3f}s)")
             return output
         except ffmpeg.Error as e:
             error_msg = e.stderr.decode() if e.stderr else str(e)
             logger.error(f"FFmpeg error creating video from image: {error_msg}")
             raise RuntimeError(f"Failed to create video from image: {error_msg}")
+
+    def create_video_from_frames(
+        self,
+        frames: List[str],
+        audio: str,
+        output: str,
+        fps: int = 2,
+    ) -> str:
+        """
+        Create video from multiple frames with audio
+
+        Args:
+            frames: List of frame image paths (must be ordered)
+            audio: Audio file path
+            output: Output video path
+            fps: Frames per second for the frames (default: 2 fps for slow animation)
+
+        Returns:
+            Path to the output video
+
+        Raises:
+            RuntimeError: If FFmpeg execution fails
+
+        Note:
+            - Frames are displayed in sequence at specified fps
+            - Video duration matches audio duration
+            - Useful for animating CSS-animated HTML templates
+
+        Example:
+            >>> frames = ['frame_0.png', 'frame_1.png', 'frame_2.png']
+            >>> compositor.create_video_from_frames(
+            ...     frames,
+            ...     "narration.mp3",
+            ...     "animated.mp4",
+            ...     fps=2
+            ... )
+        """
+        self._ensure_ffmpeg()
+
+        if not frames:
+            raise ValueError("Frames list cannot be empty")
+
+        logger.info(f"Creating video from {len(frames)} frames (fps={fps})")
+
+        try:
+            # Get audio duration to match video duration
+            audio_duration = _probe_media_duration(audio)
+            logger.debug(f"Audio duration: {audio_duration:.3f}s")
+
+            # Create temporary file list for ffmpeg concat demuxer
+            # Use glob pattern approach for simpler handling
+            import glob
+
+            # Get the directory and pattern from first frame
+            first_frame_dir = os.path.dirname(frames[0])
+            frame_pattern = os.path.join(first_frame_dir, "frame_%04d.png")
+
+            logger.debug(f"Using frame pattern: {frame_pattern}")
+
+            # Input frames with specified framerate
+            input_frames = ffmpeg.input(
+                frame_pattern,
+                framerate=fps,
+                pattern_type='sequence'
+            )
+            input_audio = ffmpeg.input(audio)
+
+            # Combine frames and audio
+            (
+                ffmpeg
+                .output(
+                    input_frames,
+                    input_audio,
+                    output,
+                    t=audio_duration,  # Force video duration to match audio
+                    vcodec='libx264',
+                    acodec='aac',
+                    pix_fmt='yuv420p',
+                    audio_bitrate='192k',
+                    preset='medium',
+                    crf=23,
+                    **{'b:v': '2M'}
+                )
+                .overwrite_output()
+                .run(capture_stdout=True, capture_stderr=True)
+            )
+
+            logger.success(f"Video created from frames: {output} (duration: {audio_duration:.3f}s)")
+            return output
+
+        except ffmpeg.Error as e:
+            error_msg = e.stderr.decode() if e.stderr else str(e)
+            logger.error(f"FFmpeg error creating video from frames: {error_msg}")
+            raise RuntimeError(f"Failed to create video from frames: {error_msg}")
+        except Exception as e:
+            logger.error(f"Error creating video from frames: {e}")
+            raise RuntimeError(f"Failed to create video from frames: {e}")
     
     def add_bgm(
         self,
