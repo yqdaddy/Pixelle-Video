@@ -813,7 +813,7 @@ class VideoService:
             Path to the output video
 
         Raises:
-            RuntimeError: If FFmpeg execution fails
+            RuntimeError: If video creation fails
 
         Note:
             - Frames are displayed in sequence at specified fps
@@ -837,59 +837,92 @@ class VideoService:
         logger.info(f"Creating video from {len(frames)} frames (fps={fps})")
 
         try:
+            from moviepy.editor import ImageSequenceClip, AudioFileClip
+
             # Get audio duration to match video duration
             audio_duration = _probe_media_duration(audio)
             logger.debug(f"Audio duration: {audio_duration:.3f}s")
 
-            # Create temporary file list for ffmpeg concat demuxer
-            # Use glob pattern approach for simpler handling
-            import glob
+            # Create video clip from frames
+            clip = ImageSequenceClip(frames, fps=fps)
 
-            # Get the directory and pattern from first frame
-            first_frame_dir = os.path.dirname(frames[0])
-            frame_pattern = os.path.join(first_frame_dir, "frame_%04d.png")
+            # Add audio
+            audio_clip = AudioFileClip(audio)
+            clip = clip.set_audio(audio_clip)
 
-            logger.debug(f"Using frame pattern: {frame_pattern}")
+            # Ensure output directory exists
+            os.makedirs(os.path.dirname(output) if os.path.dirname(output) else '.', exist_ok=True)
 
-            # Input frames with specified framerate
-            input_frames = ffmpeg.input(
-                frame_pattern,
-                framerate=fps,
-                pattern_type='sequence'
+            # Write video
+            clip.write_videofile(
+                output,
+                fps=fps,
+                codec='libx264',
+                audio_codec='aac',
+                logger=None  # Suppress moviepy verbose output
             )
-            input_audio = ffmpeg.input(audio)
 
-            # Combine frames and audio
-            (
-                ffmpeg
-                .output(
-                    input_frames,
-                    input_audio,
-                    output,
-                    t=audio_duration,  # Force video duration to match audio
-                    vcodec='libx264',
-                    acodec='aac',
-                    pix_fmt='yuv420p',
-                    audio_bitrate='192k',
-                    preset='medium',
-                    crf=23,
-                    **{'b:v': '2M'}
-                )
-                .overwrite_output()
-                .run(capture_stdout=True, capture_stderr=True)
-            )
+            # Clean up
+            clip.close()
+            audio_clip.close()
 
             logger.success(f"Video created from frames: {output} (duration: {audio_duration:.3f}s)")
             return output
 
-        except ffmpeg.Error as e:
-            error_msg = e.stderr.decode() if e.stderr else str(e)
-            logger.error(f"FFmpeg error creating video from frames: {error_msg}")
-            raise RuntimeError(f"Failed to create video from frames: {error_msg}")
+        except ImportError:
+            logger.warning("moviepy not available, falling back to ffmpeg subprocess")
+            return self._create_video_from_frames_ffmpeg(frames, audio, output, fps)
         except Exception as e:
             logger.error(f"Error creating video from frames: {e}")
             raise RuntimeError(f"Failed to create video from frames: {e}")
-    
+
+    def _create_video_from_frames_ffmpeg(
+        self,
+        frames: List[str],
+        audio: str,
+        output: str,
+        fps: int = 2,
+    ) -> str:
+        """
+        Fallback method using ffmpeg subprocess directly.
+
+        Note: This may produce invalid MP4 files on some systems due to
+        ffmpeg output redirection issues. Prefer the moviepy implementation.
+        """
+        import subprocess
+
+        # Get audio duration
+        audio_duration = _probe_media_duration(audio)
+
+        # Get the directory and pattern from first frame
+        first_frame_dir = os.path.dirname(frames[0])
+        frame_pattern = os.path.join(first_frame_dir, "frame_%04d.png")
+
+        cmd = [
+            'ffmpeg', '-y',
+            '-framerate', str(fps),
+            '-pattern_type', 'sequence',
+            '-i', frame_pattern,
+            '-i', audio,
+            '-t', str(audio_duration),
+            '-vcodec', 'libx264',
+            '-acodec', 'aac',
+            '-pix_fmt', 'yuv420p',
+            '-b:a', '192k',
+            '-preset', 'medium',
+            '-crf', '23',
+            '-b:v', '2M',
+            output
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            error_msg = result.stderr if result.stderr else "Unknown error"
+            raise RuntimeError(f"FFmpeg error: {error_msg}")
+
+        return output
+
     def add_bgm(
         self,
         video: str,
